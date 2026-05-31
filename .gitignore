@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.spec.bak
+
+# PyInstaller
+dist/
+build/
+*.spec.tmp
+
+# Logs & Outputs
+*.log
+*.json.bak
+pentest_*.json
+nmap_*.xml
+*.hc22000
+
+# Secrets (niemals committen!)
+suite_config.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Windows
+Thumbs.db
+desktop.ini

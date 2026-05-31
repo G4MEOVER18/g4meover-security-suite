@@ -1,0 +1,21 @@
+{
+  "_comment":          "Kopiere diese Datei nach suite_config.json und passe die Pfade an.",
+  "tool_nmap":         "C:\\Program Files (x86)\\Nmap\\nmap.exe",
+  "tool_hashcat":      "C:\\tools\\hashcat\\hashcat.exe",
+  "tool_gobuster":     "C:\\tools\\gobuster\\gobuster.exe",
+  "tool_feroxbuster":  "C:\\tools\\feroxbuster\\feroxbuster.exe",
+  "tool_nikto":        "C:\\tools\\nikto\\nikto.bat",
+  "tool_sqlmap":       "C:\\tools\\sqlmap\\sqlmap.exe",
+  "tool_hydra":        "C:\\tools\\hydra\\hydra.bat",
+  "tool_john":         "C:\\tools\\john\\run\\john.exe",
+  "tool_masscan":      "C:\\tools\\masscan\\masscan.bat",
+  "tool_tshark":       "C:\\Program Files\\Wireshark\\tshark.exe",
+  "tool_msfconsole":   "C:\\metasploit-framework\\bin\\msfconsole.bat",
+  "tool_searchsploit": "C:\\tools\\exploitdb\\searchsploit.bat",
+  "tool_whatweb":      "C:\\tools\\whatweb\\whatweb.bat",
+  "shodan_api_key":    "",
+  "virustotal_api_key": "",
+  "workspace":         "C:\\Users\\Public\\pentest",
+  "proxy":             "",
+  "theme":             "catppuccin_mocha"
+}
