@@ -51,6 +51,7 @@ from modules.exploit_research import ExploitResearchModule
 from modules.reporting        import ReportingModule
 from modules.settings         import SettingsModule
 from modules.help             import HelpModule
+from modules.pmkid            import PmkidModule
 
 
 # ─── Hauptfenster ─────────────────────────────────────────────────────────────
@@ -138,12 +139,14 @@ class G4MEOVERSuite(tk.Tk):
         self._exploit   = ExploitResearchModule(self._nb, **common)
         self._reporting = ReportingModule(self._nb, **common)
         self._settings  = SettingsModule(self._nb, **common)
+        self._pmkid     = PmkidModule(self._nb, **common)
         self._help      = HelpModule(self._nb, **common)
 
         tab_defs = [
             (self._dashboard, "  Dashboard  "),
             (self._network,   "  Netzwerk   "),
             (self._wifi,      "  WiFi / WPA "),
+            (self._pmkid,     "  PMKID      "),
             (self._passwords, "  Passwörter "),
             (self._web,       "  Web-Testing"),
             (self._osint,     "  OSINT      "),
