@@ -16,20 +16,48 @@ from utils.theme import DARK
 
 # ─── Interface-Erkennung ──────────────────────────────────────────────────────
 
-def _get_tshark_interfaces() -> list[tuple[str, str]]:
+_TSHARK_DEFAULTS = [
+    r"C:\Program Files\Wireshark\tshark.exe",
+    r"C:\Program Files (x86)\Wireshark\tshark.exe",
+    "tshark",
+]
+
+
+def _get_tshark_interfaces(tshark_exe: str = "") -> list[tuple[str, str]]:
     """Gibt [(index, name), ...] aller tshark-Interfaces zurück."""
-    try:
-        out = subprocess.check_output(
-            ["tshark", "-D"], stderr=subprocess.STDOUT,
-            text=True, timeout=10)
-    except Exception:
-        return []
+    candidates = ([tshark_exe] if tshark_exe else []) + _TSHARK_DEFAULTS
+    out = ""
+    for exe in candidates:
+        try:
+            out = subprocess.check_output(
+                [exe, "-D"], stderr=subprocess.STDOUT,
+                text=True, timeout=10)
+            break
+        except Exception:
+            continue
+    if not out:
+        return _fallback_interfaces()
     result = []
     for line in out.splitlines():
+        # Format: "1. \Device\NPF_{GUID} (Name)" oder "1. \Device\NPF_Loopback (Name)"
         m = re.match(r"(\d+)\.\s+\\Device\\NPF_\S+\s+\((.+?)\)", line)
         if m:
             result.append((m.group(1), m.group(2)))
     return result
+
+
+def _fallback_interfaces() -> list[tuple[str, str]]:
+    """Fallback: Scapy-Interfaces wenn tshark nicht verfügbar."""
+    try:
+        from scapy.arch.windows import get_windows_if_list
+        ifaces = get_windows_if_list()
+        result = []
+        for i, iface in enumerate(ifaces, start=1):
+            name = iface.get("name") or iface.get("description", f"Interface {i}")
+            result.append((str(i), name))
+        return result
+    except Exception:
+        return []
 
 
 def _get_netsh_networks() -> list[dict]:
@@ -142,10 +170,18 @@ def _sniff_handshakes(iface_dev: str, target_bssid: str,
 
 
 def _tshark_sniff(iface_num: str, target_bssid: str, outfile: str,
-                  on_line, stop_evt: threading.Event):
+                  on_line, stop_evt: threading.Event, tshark_exe: str = "tshark"):
     """tshark-basierter Sniffer (robuster, kein Monitor-Mode nötig)."""
+    # Fallback auf bekannte Standardpfade wenn 'tshark' nicht im PATH
+    exe = tshark_exe or "tshark"
+    if exe == "tshark" and not any(
+            os.path.exists(p) for p in _TSHARK_DEFAULTS[:2]):
+        for p in _TSHARK_DEFAULTS:
+            if os.path.exists(p):
+                exe = p
+                break
     cmd = [
-        "tshark",
+        exe,
         "-i", iface_num,
         "-f", "ether proto 0x888e",
         "-w", outfile,
@@ -450,7 +486,8 @@ class HandshakeModule(BaseModule):
     # ── Interface-Verwaltung ──────────────────────────────────────────────────
 
     def _reload_ifaces(self):
-        ifaces = _get_tshark_interfaces()
+        tshark_exe = self.cfg.get("tool_tshark", "")
+        ifaces = _get_tshark_interfaces(tshark_exe)
         self._iface_map.clear()
         self._iface_dev_map.clear()
         display = []
@@ -461,13 +498,16 @@ class HandshakeModule(BaseModule):
         self._iface_cb["values"] = display
         # WLAN bevorzugen
         for d in display:
-            if "WLAN" in d or "Wi-Fi" in d or "Wireless" in d:
+            if any(w in d for w in ("WLAN", "Wi-Fi", "Wireless", "WiFi", "802.11")):
                 self._iface_var.set(d)
                 break
         else:
             if display:
                 self._iface_var.set(display[0])
-        self._log_line(f"[*] {len(ifaces)} Interface(s) gefunden.")
+        if ifaces:
+            self._log_line(f"[*] {len(ifaces)} Interface(s) gefunden.")
+        else:
+            self._log_line("[!] Keine Interfaces gefunden – tshark/Npcap installiert?")
 
     def _get_iface_num(self) -> str:
         return self._iface_map.get(self._iface_var.get(), "")
@@ -558,10 +598,12 @@ class HandshakeModule(BaseModule):
                       self._on_frame, self._on_handshake_complete, self._stop_evt),
                 daemon=True)
         else:
+            tshark_exe = self.cfg.get("tool_tshark", "tshark")
             t = threading.Thread(
                 target=_tshark_sniff,
                 args=(iface_num, target_bssid, outfile,
-                      lambda l: self.after(0, self._log_line, l), self._stop_evt),
+                      lambda l: self.after(0, self._log_line, l),
+                      self._stop_evt, tshark_exe),
                 daemon=True)
         t.start()
 
