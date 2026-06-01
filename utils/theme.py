@@ -38,51 +38,116 @@ CVSS_COLOR = {
 def build_style(root):
     s = ttk.Style(root)
     s.theme_use("clam")
+
+    # Basis-Widgets
     for w in ("TFrame", "TLabelframe", "TLabelframe.Label",
-              "TLabel", "TNotebook", "TNotebook.Tab"):
+              "TLabel", "TNotebook"):
         s.configure(w, background=DARK["bg"], foreground=DARK["fg"],
                     bordercolor=DARK["border"])
-    s.configure("TNotebook.Tab", padding=(14, 6),
-                background=DARK["btn"], foreground=DARK["fg"])
+
+    # Notebook-Tabs: etwas mehr Padding, Icon-Platz links
+    s.configure("TNotebook",       background=DARK["panel"],
+                                   tabmargins=[2, 4, 0, 0])
+    s.configure("TNotebook.Tab",   padding=(10, 6),
+                                   background=DARK["btn"],
+                                   foreground=DARK["border"],
+                                   font=("Segoe UI", 9))
     s.map("TNotebook.Tab",
-          background=[("selected", DARK["accent"])],
-          foreground=[("selected", DARK["bg"])])
+          background=[("selected", DARK["panel"]),
+                      ("active",   DARK["btn_act"])],
+          foreground=[("selected", DARK["accent"]),
+                      ("active",   DARK["fg"])],
+          relief=[("selected", "flat")])
+
+    # Entry / Combobox
     s.configure("TEntry",
                 fieldbackground=DARK["entry"], foreground=DARK["fg"],
-                insertcolor=DARK["fg"], bordercolor=DARK["border"], relief="flat")
+                insertcolor=DARK["accent"], bordercolor=DARK["border"],
+                relief="flat", padding=4)
     s.configure("TCombobox",
                 fieldbackground=DARK["entry"], foreground=DARK["fg"],
                 background=DARK["entry"], selectbackground=DARK["accent"],
                 bordercolor=DARK["border"])
+
+    # Standard-Button
     s.configure("TButton",
                 background=DARK["btn"], foreground=DARK["fg"],
-                bordercolor=DARK["border"], relief="flat", padding=(8, 4))
-    s.map("TButton", background=[("active", DARK["btn_act"])])
+                bordercolor=DARK["border"], relief="flat",
+                padding=(10, 5), font=("Segoe UI", 9))
+    s.map("TButton",
+          background=[("active", DARK["btn_act"]),
+                      ("pressed", DARK["border"])])
+
+    # Farbige Buttons
     s.configure("Accent.TButton",
-                background=DARK["accent"], foreground=DARK["bg"], padding=(10, 5))
-    s.map("Accent.TButton", background=[("active", "#74c7ec")])
+                background=DARK["accent"], foreground=DARK["bg"],
+                padding=(10, 5), font=("Segoe UI", 9, "bold"))
+    s.map("Accent.TButton",
+          background=[("active", "#74c7ec"), ("pressed", "#89b4fa")])
+
     s.configure("Danger.TButton",
-                background=DARK["red"], foreground=DARK["bg"], padding=(10, 5))
-    s.map("Danger.TButton", background=[("active", "#eba0ac")])
+                background=DARK["red"], foreground=DARK["bg"],
+                padding=(10, 5), font=("Segoe UI", 9, "bold"))
+    s.map("Danger.TButton",
+          background=[("active", "#eba0ac"), ("pressed", "#f38ba8")])
+
     s.configure("Success.TButton",
-                background=DARK["green"], foreground=DARK["bg"], padding=(10, 5))
-    s.map("Success.TButton", background=[("active", "#89dceb")])
-    s.configure("TCheckbutton", background=DARK["bg"], foreground=DARK["fg"])
+                background=DARK["green"], foreground=DARK["bg"],
+                padding=(10, 5), font=("Segoe UI", 9, "bold"))
+    s.map("Success.TButton",
+          background=[("active", "#94e2d5"), ("pressed", "#a6e3a1")])
+
+    s.configure("Teal.TButton",
+                background=DARK["teal"], foreground=DARK["bg"],
+                padding=(10, 5), font=("Segoe UI", 9))
+    s.map("Teal.TButton",
+          background=[("active", "#89dceb"), ("pressed", "#94e2d5")])
+
+    s.configure("Warning.TButton",
+                background=DARK["yellow"], foreground=DARK["bg"],
+                padding=(10, 5), font=("Segoe UI", 9))
+    s.map("Warning.TButton",
+          background=[("active", "#fab387"), ("pressed", "#f9e2af")])
+
+    # Checkbutton / Radiobutton
+    s.configure("TCheckbutton",
+                background=DARK["bg"], foreground=DARK["fg"],
+                font=("Segoe UI", 9))
+    s.configure("TRadiobutton",
+                background=DARK["bg"], foreground=DARK["fg"],
+                font=("Segoe UI", 9))
+
+    # Scrollbar
     s.configure("TScrollbar",
                 background=DARK["btn"], troughcolor=DARK["panel"],
-                arrowcolor=DARK["fg"])
+                arrowcolor=DARK["border"], relief="flat", borderwidth=0)
+    s.map("TScrollbar",
+          background=[("active", DARK["btn_act"])])
+
+    # Treeview
     s.configure("Treeview",
                 background=DARK["entry"], foreground=DARK["fg"],
                 fieldbackground=DARK["entry"], bordercolor=DARK["border"],
-                rowheight=22)
+                rowheight=24, font=("Segoe UI", 9))
     s.configure("Treeview.Heading",
-                background=DARK["btn"], foreground=DARK["accent"],
-                relief="flat")
-    s.map("Treeview", background=[("selected", DARK["accent"])],
+                background=DARK["panel"], foreground=DARK["accent"],
+                relief="flat", font=("Segoe UI", 9, "bold"),
+                bordercolor=DARK["border"])
+    s.map("Treeview",
+          background=[("selected", DARK["accent"])],
           foreground=[("selected", DARK["bg"])])
+    s.map("Treeview.Heading",
+          background=[("active", DARK["btn_act"])])
+
+    # Spinbox / Scale / Separator / Progressbar
     s.configure("TSpinbox",
                 fieldbackground=DARK["entry"], foreground=DARK["fg"],
-                background=DARK["entry"], insertcolor=DARK["fg"])
+                background=DARK["entry"], insertcolor=DARK["accent"])
     s.configure("TScale",
-                background=DARK["bg"], troughcolor=DARK["entry"])
-    s.configure("TSeparator", background=DARK["border"])
+                background=DARK["bg"], troughcolor=DARK["entry"],
+                sliderlength=16)
+    s.configure("TSeparator",  background=DARK["border"])
+    s.configure("TProgressbar",
+                background=DARK["accent"], troughcolor=DARK["entry"],
+                bordercolor=DARK["border"], lightcolor=DARK["accent"],
+                darkcolor=DARK["accent"])
