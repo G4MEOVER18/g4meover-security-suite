@@ -52,6 +52,7 @@ from modules.reporting        import ReportingModule
 from modules.settings         import SettingsModule
 from modules.help             import HelpModule
 from modules.pmkid            import PmkidModule
+from modules.handshake        import HandshakeModule
 
 
 # ─── Hauptfenster ─────────────────────────────────────────────────────────────
@@ -140,20 +141,22 @@ class G4MEOVERSuite(tk.Tk):
         self._reporting = ReportingModule(self._nb, **common)
         self._settings  = SettingsModule(self._nb, **common)
         self._pmkid     = PmkidModule(self._nb, **common)
+        self._handshake = HandshakeModule(self._nb, **common)
         self._help      = HelpModule(self._nb, **common)
 
         tab_defs = [
-            (self._dashboard, "  Dashboard  "),
-            (self._network,   "  Netzwerk   "),
-            (self._wifi,      "  WiFi / WPA "),
-            (self._pmkid,     "  PMKID      "),
-            (self._passwords, "  Passwörter "),
-            (self._web,       "  Web-Testing"),
-            (self._osint,     "  OSINT      "),
-            (self._exploit,   "  Exploits   "),
-            (self._reporting, "  Reporting  "),
+            (self._dashboard, "  Dashboard    "),
+            (self._network,   "  Netzwerk     "),
+            (self._wifi,      "  WiFi / WPA   "),
+            (self._handshake, "  Handshake    "),
+            (self._pmkid,     "  PMKID        "),
+            (self._passwords, "  Passwörter   "),
+            (self._web,       "  Web-Testing  "),
+            (self._osint,     "  OSINT        "),
+            (self._exploit,   "  Exploits     "),
+            (self._reporting, "  Reporting    "),
             (self._settings,  "  Einstellungen"),
-            (self._help,      "  Hilfe  "),
+            (self._help,      "  Hilfe        "),
         ]
         for module, label in tab_defs:
             self._nb.add(module, text=label)
@@ -182,7 +185,8 @@ class G4MEOVERSuite(tk.Tk):
     # ── Callbacks ─────────────────────────────────────────────────────────────
 
     def _activity_cb(self, text: str):
-        self._status_var.set(text[:120])
+        if hasattr(self, "_status_var"):
+            self._status_var.set(text[:120])
         if hasattr(self, "_dashboard"):
             self._dashboard.add_activity(text)
 

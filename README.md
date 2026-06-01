@@ -4,11 +4,11 @@
 
 **All-in-One Pentesting-GUI für Windows · Python 3.12 · Catppuccin Mocha**
 
-[![Version](https://img.shields.io/badge/Version-1.3-blue?style=flat-square)](https://github.com/G4MEOVER18/g4meover-security-suite/releases)
+[![Version](https://img.shields.io/badge/Version-1.4-blue?style=flat-square)](https://github.com/G4MEOVER18/g4meover-security-suite/releases)
 [![Python](https://img.shields.io/badge/Python-3.12-blue?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Plattform](https://img.shields.io/badge/Plattform-Windows%2011-lightgrey?style=flat-square&logo=windows)](.)
 [![Lizenz](https://img.shields.io/badge/Lizenz-MIT-green?style=flat-square)](LICENSE)
-[![GitHub Stars](https://img.shields.io/github/stars/G4MEOVER18/g4meover-security-suite?style=flat-square)](https://github.com/G4MEOVER18/g4meover-security-suite/stargazers)
+[![Stars](https://img.shields.io/github/stars/G4MEOVER18/g4meover-security-suite?style=flat-square&color=yellow)](https://github.com/G4MEOVER18/g4meover-security-suite/stargazers)
 
 *Entwickelt von **Yanis Ameseder***
 
@@ -22,82 +22,89 @@ Die **G4MEOVER Security Suite** vereint 13+ Sicherheitstools unter einer einheit
 
 ## Screenshots
 
-### Dashboard – Übersicht & Tool-Status
+### Dashboard
 ![Dashboard](assets/screenshots/01_dashboard.png)
-*Farbige Tool-Status-Badges, Activity-Log, Quickstart-Buttons und globale Ziel-Eingabe im Header.*
+*Tool-Status-Badges für alle 13 Tools, Activity-Log der letzten Aktionen, Quickstart-Buttons und globale Ziel-Eingabe im Header.*
 
 ---
 
 ### Netzwerk-Scanner
 ![Netzwerk](assets/screenshots/02_netzwerk.png)
-*nmap mit 7 vorkonfigurierten Scan-Profilen (Quick, Stealth, Full, Vuln...) + Masscan Quick-Sweep. Ergebnisse im farbkodierten Treeview, Export als JSON/TXT.*
+*nmap mit 7 Scan-Profilen (Quick, Stealth, Full, Vuln...) und Masscan Quick-Sweep. Farbkodierter Treeview, Export JSON/TXT, History der letzten 10 Scans.*
 
 ---
 
-### WiFi / WPA-Cracking
+### WiFi / WPA
 ![WiFi WPA](assets/screenshots/03_wifi_wpa.png)
-*PCAP → hc22000-Konvertierung (Streaming, auch für große Captures), PCAP-Inspektor mit BSSID/OUI-Lookup (online via macvendors.com), Hashcat-Launcher mit Live-Statistiken und Potfile-Viewer.*
+*PCAP → hc22000-Konvertierung (Streaming), PCAP-Inspektor mit BSSID/OUI-Hersteller-Lookup (online + lokal), Hashcat-Launcher mit Live-Statistiken, Potfile-Viewer.*
 
 ---
 
-### PMKID-Sniffer
-![PMKID](assets/screenshots/04_passwoerter.png)
-*Extrahiert PMKIDs aus bestehenden PCAP-Dateien oder per Live-Capture (tshark). Direkte Übergabe an hashcat -m 22000. Kein WPA-Handshake erforderlich.*
+### Handshake-Sniffer
+![Handshake](assets/screenshots/04_handshake.png)
+*WPA/WPA2 4-Way-Handshake-Capture. Netzwerk-Scan via Windows WLAN-API, passiver Capture mit tshark oder Scapy, **Deauth-Angriff** (Broadcast oder gezielt), automatische PCAP → hc22000 Konvertierung.*
+
+---
+
+### PMKID-Extraktor
+![PMKID](assets/screenshots/05_pmkid.png)
+*Extrahiert PMKIDs aus bestehenden PCAP-Dateien (kein Handshake nötig) oder per Live-Capture. Direkte Übergabe an hashcat -m 22000.*
 
 ---
 
 ### Passwort-Cracker
-![Passwörter](assets/screenshots/04_passwoerter.png)
-*Hashcat (GPU, alle Modi), John the Ripper und Hydra (Online-Brute-Force: SSH, FTP, HTTP, RDP, SMB...) in einem Tab. Gefundene Credentials werden grün hervorgehoben.*
+![Passwörter](assets/screenshots/06_passwoerter.png)
+*Hashcat (GPU, alle Modi), John the Ripper und Hydra (Online-Brute-Force: SSH, FTP, HTTP, RDP, SMB). Gefundene Credentials grün hervorgehoben.*
 
 ---
 
 ### Web-Testing
-![Web](assets/screenshots/05_web.png)
-*Directory-Bruteforce mit gobuster/feroxbuster (Status-Code-Farben), nikto HTTP-Scanner, SQLMap-Wrapper und Tech-Fingerprinting (WhatWeb: CMS, Framework, Server, WAF).*
+![Web](assets/screenshots/07_web.png)
+*Directory-Bruteforce (gobuster/feroxbuster, Status-Code-Farben), nikto HTTP-Scanner, SQLMap SQL-Injection, WhatWeb Tech-Fingerprinting (CMS, Framework, Server, WAF).*
 
 ---
 
 ### OSINT
-![OSINT](assets/screenshots/06_osint.png)
-*WhoIs, DNS-Lookup (A/MX/TXT/NS), Subdomain-Enumeration via crt.sh, IP-Geolokation, Shodan-Integration, Reverse-IP und OUI/BSSID-Hersteller-Lookup.*
+![OSINT](assets/screenshots/08_osint.png)
+*WhoIs, DNS (A/MX/TXT/NS/CNAME), Subdomain-Enumeration via crt.sh, IP-Geolokation, Shodan-Integration, Reverse-IP, OUI/BSSID-Hersteller.*
 
 ---
 
-### Exploits & CVE-Recherche
-![Exploits](assets/screenshots/07_exploits.png)
-*SearchSploit-Wrapper (47.000+ ExploitDB-Einträge, kein Ruby nötig), NIST NVD CVE-Suche mit CVSS-Score-Badge und optionaler Metasploit-Launcher.*
+### Exploits & CVE
+![Exploits](assets/screenshots/09_exploits.png)
+*SearchSploit-Wrapper (47.000+ ExploitDB-Einträge, kein Ruby), NIST NVD CVE-Suche mit CVSS-Score-Badges (grün/gelb/orange/rot), optionaler Metasploit-Launcher.*
 
 ---
 
 ### Reporting
-![Reporting](assets/screenshots/08_reporting.png)
-*Findings-Manager (Kritisch/Hoch/Mittel/Niedrig/Info), Session-Timeline aller Tool-Ausführungen, automatischer Report-Generator (Markdown, HTML, TXT).*
+![Reporting](assets/screenshots/10_reporting.png)
+*Findings-Manager (Kritisch/Hoch/Mittel/Niedrig/Info), Session-Timeline, automatischer Report-Generator (Markdown, HTML, TXT).*
 
 ---
 
 ### Einstellungen
-![Einstellungen](assets/screenshots/09_einstellungen.png)
-*Tool-Pfade für alle 13 Tools, API-Keys (Shodan, VirusTotal), Workspace-Verzeichnis, Proxy-Einstellungen und automatische Tool-Erkennung.*
+![Einstellungen](assets/screenshots/11_einstellungen.png)
+*Tool-Pfade für alle 13 Tools, API-Keys (Shodan, VirusTotal), Workspace-Verzeichnis, Proxy und automatische Tool-Erkennung.*
 
 ---
 
 ### Hilfe-System
-![Hilfe](assets/screenshots/10_hilfe.png)
+![Hilfe](assets/screenshots/12_hilfe.png)
 *Interaktive Schritt-für-Schritt-Anleitungen für jedes Modul mit Tipps, Befehlsbeispielen und vollständigem Pentest-Workflow.*
 
 ---
 
-## Funktionen im Überblick
+## Funktionen
 
-| Tab | Enthaltene Tools | Funktion |
-|-----|-----------------|----------|
-| **Dashboard** | — | Tool-Status, Activity-Log, Quickstart-Buttons |
+| Tab | Tools | Funktion |
+|-----|-------|----------|
+| **Dashboard** | — | Tool-Status, Activity-Log, Quickstart |
 | **Netzwerk** | nmap, masscan | Host-Discovery, Port-Scan, OS-Erkennung |
 | **WiFi / WPA** | hashcat, tshark | PCAP-Konvertierung, WPA-Cracking, BSSID-Lookup |
-| **PMKID** | tshark, hashcat | PMKID-Extraktion aus PCAP, Live-Sniffing |
+| **Handshake** | tshark, Scapy | 4-Way-Handshake-Sniffer + Deauth-Angriff |
+| **PMKID** | tshark, hashcat | PMKID-Extraktion, Live-Sniffing |
 | **Passwörter** | hashcat, john, hydra | Hash-Cracking (GPU), Online-Brute-Force |
-| **Web-Testing** | gobuster, feroxbuster, nikto, sqlmap, whatweb | Dir-Scan, HTTP-Audit, SQL-Injection, Fingerprinting |
+| **Web-Testing** | gobuster, nikto, sqlmap, whatweb | Dir-Scan, HTTP-Audit, SQL-Inj., Fingerprinting |
 | **OSINT** | — | WhoIs, DNS, Subdomain-Enum, Shodan, Geo-IP |
 | **Exploits** | searchsploit, metasploit | CVE-Suche, ExploitDB, MSF-Launcher |
 | **Reporting** | — | Findings, Markdown-/HTML-Report |
@@ -108,97 +115,107 @@ Die **G4MEOVER Security Suite** vereint 13+ Sicherheitstools unter einer einheit
 
 ## Installation
 
-### Voraussetzungen
-
-- **Python 3.12+** (inkl. tkinter)
-- **Windows 10/11**
-
 ```bash
 git clone https://github.com/G4MEOVER18/g4meover-security-suite.git
 cd g4meover-security-suite
+pip install scapy pillow requests
 python openclaw_suite.py
 ```
 
-### Optionale externe Tools (werden automatisch erkannt)
+### Empfohlene externe Tools
 
 | Tool | Download | Funktion |
 |------|----------|----------|
 | nmap | [nmap.org](https://nmap.org/download.html) | Port-Scanner |
 | hashcat | [hashcat.net](https://hashcat.net/hashcat/) | GPU Hash-Cracker |
 | gobuster | [GitHub](https://github.com/OJ/gobuster/releases) | Dir-Bruteforce |
-| feroxbuster | [GitHub](https://github.com/epi052/feroxbuster/releases) | Dir-Bruteforce rekursiv |
+| feroxbuster | [GitHub](https://github.com/epi052/feroxbuster/releases) | Rekursiver Dir-Scanner |
 | nikto | [GitHub](https://github.com/sullo/nikto) | Web-Scanner |
 | sqlmap | [sqlmap.org](https://sqlmap.org/) | SQL-Injection |
 | john | [openwall.com](https://www.openwall.com/john/) | Password Cracker |
-| tshark | [Wireshark](https://www.wireshark.org/download.html) | Paket-Analyse |
+| tshark | [Wireshark](https://www.wireshark.org/download.html) | Paket-Analyse / Capture |
 | metasploit | [metasploit.com](https://www.metasploit.com/download) | Exploit-Framework |
 
-Python-Alternativen für hydra, masscan und whatweb sind bereits enthalten – kein separater Download nötig.
+> Python-Alternativen für **hydra**, **masscan** und **whatweb** sind bereits enthalten.
+
+### Handshake-Sniffer & Deauth
+
+Für Monitor-Mode und Packet-Injection (Deauth-Angriff) wird ein kompatibler WLAN-Adapter benötigt:
+- **Alfa AWUS036ACH** (Realtek RTL8812AU) – empfohlen
+- **TP-Link TL-WN722N v1** (Atheros AR9271)
+- **Panda PAU09** (Ralink RT5572)
+
+Passiver Handshake-Capture funktioniert auch ohne Monitor-Mode, sofern ein Client sich gerade verbindet.
 
 ---
 
 ## EXE bauen
 
-Eigene `.exe` mit Icon und Versions-Info erstellen:
-
 ```batch
-# 1. Icon einfügen (optional)
 copy mein-logo.ico assets\g4meover.ico
-
-# 2. EXE bauen
 build_exe.bat
 ```
 
-Die fertige EXE liegt dann unter `dist\G4MEOVER_Suite.exe` (~12 MB, kein Konsolenfenster).
+Ausgabe: `dist\G4MEOVER_Suite.exe` (~12 MB, kein Konsolenfenster, eigenes Icon)
 
 ---
 
-## KI-Integration (AI-Core API)
-
-Ein leichtgewichtiger HTTP-Server stellt die Suite-Funktionen für KI-Systeme bereit:
+## KI-Integration
 
 ```bash
-python pentest_api_server.py
-# Läuft auf http://0.0.0.0:18800
+python pentest_api_server.py   # Port 18800
 ```
 
 | Endpoint | Parameter | Funktion |
 |----------|-----------|----------|
-| `GET /searchsploit` | `?query=apache` | ExploitDB durchsuchen |
-| `GET /cve` | `?query=CVE-2021-44228` | NIST CVE-Datenbank |
-| `GET /nmap` | `?target=192.168.1.1&profile=quick` | Nmap-Scan ausführen |
-| `GET /bssid` | `?mac=AA:BB:CC:DD:EE:FF` | BSSID-Hersteller |
-| `GET /tools` | — | Installierte Tools auflisten |
+| `/searchsploit` | `?query=apache` | ExploitDB durchsuchen |
+| `/cve` | `?query=CVE-2021-44228` | NIST CVE-Lookup |
+| `/nmap` | `?target=192.168.1.1` | Nmap ausführen |
+| `/bssid` | `?mac=AA:BB:CC` | Hersteller-Lookup |
 
-Kompatibel mit **Ollama** (Function-Calling) – fertige Tool-Definitionen in `ai_core_client.py`.
+Ollama-kompatible Tool-Definitionen in `ai_core_client.py`.
 
 ---
 
 ## Konfiguration
 
-Kopiere `suite_config.example.json` nach `suite_config.json` und passe die Pfade an:
-
-```json
-{
-  "tool_nmap":         "C:\\Program Files (x86)\\Nmap\\nmap.exe",
-  "tool_hashcat":      "C:\\tools\\hashcat\\hashcat.exe",
-  "shodan_api_key":    "DEIN_API_KEY",
-  "workspace":         "C:\\Users\\Public\\pentest"
-}
+```bash
+cp suite_config.example.json suite_config.json
+# Pfade und API-Keys anpassen
 ```
 
-> **Hinweis:** `suite_config.json` ist in `.gitignore` – deine Pfade und API-Keys bleiben lokal.
+`suite_config.json` ist in `.gitignore` – deine Daten bleiben lokal.
 
 ---
 
 ## Disclaimer
 
-> Dieses Tool ist **ausschließlich für autorisierte Sicherheitstests, CTF-Challenges und Bildungszwecke** bestimmt. Jegliche missbräuchliche Nutzung gegen Systeme ohne ausdrückliche Genehmigung ist illegal und liegt in der alleinigen Verantwortung des Benutzers. Der Entwickler übernimmt keine Haftung.
+> Dieses Tool ist **ausschließlich für autorisierte Sicherheitstests, CTF-Challenges und Bildungszwecke** bestimmt. Die Nutzung gegen Systeme ohne ausdrückliche schriftliche Genehmigung ist illegal. Der Entwickler übernimmt keinerlei Haftung für Missbrauch.
+
+---
+
+## Unterstützung
+
+Wenn dir dieses Projekt gefällt, kannst du die Entwicklung unterstützen:
+
+<div align="center">
+
+### PayPal
+[![PayPal](https://img.shields.io/badge/PayPal-Spenden-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/Freakbank1)
+
+### Bitcoin
+```
+39vZWmnUwDReQ15BwqQXzyqVQ6U8LardEf
+```
+
+</div>
 
 ---
 
 <div align="center">
 
 **G4MEOVER Security Suite** · Entwickelt von Yanis Ameseder · MIT Lizenz
+
+[GitHub](https://github.com/G4MEOVER18/g4meover-security-suite) · [Issues](https://github.com/G4MEOVER18/g4meover-security-suite/issues) · [Releases](https://github.com/G4MEOVER18/g4meover-security-suite/releases)
 
 </div>
