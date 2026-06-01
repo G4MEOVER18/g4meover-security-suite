@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller Spec für den G4MEOVER Installer
-# Enthält die Suite-Dateien + builtin-Tools als Daten
+# Enthält die Suite-Dateien + alle builtin-Tools als Daten
 
 import os
 ROOT = os.path.abspath(os.path.join(SPECPATH, '..'))
@@ -12,16 +12,31 @@ a = Analysis(
     pathex=[ROOT],
     binaries=[],
     datas=[
-        # Komplette Suite einbetten
-        (os.path.join(ROOT, 'openclaw_suite.py'),        '.'),
-        (os.path.join(ROOT, 'modules'),                  'modules'),
-        (os.path.join(ROOT, 'utils'),                    'utils'),
-        (os.path.join(ROOT, 'suite_config.example.json'),'.'),
-        (os.path.join(ROOT, 'assets'),                   'assets'),
-        # Builtin-Tools einbetten
-        (r'C:\tools\hydra',    'tools_builtin/hydra'),
-        (r'C:\tools\masscan',  'tools_builtin/masscan'),
-        (r'C:\tools\whatweb',  'tools_builtin/whatweb'),
+        # ── Komplette Suite einbetten ────────────────────────────────────────
+        (os.path.join(ROOT, 'openclaw_suite.py'),         'suite'),
+        (os.path.join(ROOT, 'modules'),                   'suite/modules'),
+        (os.path.join(ROOT, 'utils'),                     'suite/utils'),
+        (os.path.join(ROOT, 'suite_config.example.json'), 'suite'),
+        (os.path.join(ROOT, 'assets'),                    'suite/assets'),
+
+        # ── Builtin-Tools einbetten ──────────────────────────────────────────
+        # gobuster (~9.9 MB)
+        (r'C:\tools\gobuster\gobuster.exe',
+                                                    'tools_builtin/gobuster'),
+        # feroxbuster (~6 MB)
+        (r'C:\tools\feroxbuster\feroxbuster.exe',
+                                                    'tools_builtin/feroxbuster'),
+        # John the Ripper – nur die EXE (~7 MB)
+        (r'C:\tools\john\john-1.9.0-jumbo-1-win64\run\john.exe',
+                                                    'tools_builtin/john'),
+        # nikto – komplettes Verzeichnis mit nikto-main/ (~2 MB)
+        (r'C:\tools\nikto',                         'tools_builtin/nikto'),
+        # ExploitDB – CSV-Datenbank + searchsploit-Scripts (~16 MB)
+        (r'C:\tools\exploitdb',                     'tools_builtin/exploitdb'),
+        # Hydra, Masscan, WhatWeb – Python-Implementierungen
+        (r'C:\tools\hydra',                         'tools_builtin/hydra'),
+        (r'C:\tools\masscan',                       'tools_builtin/masscan'),
+        (r'C:\tools\whatweb',                       'tools_builtin/whatweb'),
     ],
     hiddenimports=[
         'tkinter', 'tkinter.ttk', 'tkinter.filedialog',
@@ -55,5 +70,5 @@ exe = EXE(
     console=False,
     icon=os.path.join(ROOT, 'assets', 'g4meover.ico'),
     version=os.path.join(ROOT, 'version_info.txt'),
-    uac_admin=True,         # Fordert Admin-Rechte an
+    uac_admin=True,
 )

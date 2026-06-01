@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-G4MEOVER Security Suite – Installer
-Installiert die Suite + alle Tools auf einem neuen Windows-System.
+G4MEOVER Security Suite – Installer v1.4
+Alle Tools sind direkt im Installer eingebettet (offline-fähig).
+Nur nmap, Wireshark und hashcat werden per winget/Download nachgeladen.
 """
 import sys
 import os
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
 import threading
 import subprocess
 import urllib.request
-import urllib.error
-import zipfile
 import json
 import shutil
 import time
@@ -23,7 +22,7 @@ SUITE_NAME = "G4MEOVER Security Suite"
 AUTHOR     = "Yanis Ameseder"
 GITHUB     = "https://github.com/G4MEOVER18/g4meover-security-suite"
 
-# ─── Farben (Catppuccin Mocha) ────────────────────────────────────────────────
+# Catppuccin Mocha
 BG     = "#1e1e2e"
 PANEL  = "#313244"
 ACCENT = "#89b4fa"
@@ -32,761 +31,668 @@ RED    = "#f38ba8"
 YELLOW = "#f9e2af"
 FG     = "#cdd6f4"
 BORDER = "#585b70"
-
-# ─── Tool-Download-Definitionen ───────────────────────────────────────────────
-# Format: (name, beschreibung, url_oder_winget, typ, ziel_pfad_relativ)
-# typ: "github_release" | "direct" | "winget" | "pip" | "git_clone" | "builtin"
+MAUVE  = "#cba6f7"
 
 DEFAULT_INSTALL = Path("C:/tools/G4MEOVER")
 
-TOOLS: list[dict] = [
-    {
-        "id":    "python_deps",
-        "name":  "Python-Pakete",
-        "desc":  "scapy, pillow, requests, pywin32",
-        "type":  "pip",
-        "pkgs":  ["scapy", "pillow", "requests", "pywin32"],
-        "default": True,
-    },
-    {
-        "id":    "nmap",
-        "name":  "nmap 7.95",
-        "desc":  "Port-Scanner – winget install nmap",
-        "type":  "winget",
-        "pkg":   "Insecure.Nmap",
-        "path":  r"C:\Program Files (x86)\Nmap\nmap.exe",
-        "default": True,
-    },
-    {
-        "id":    "wireshark",
-        "name":  "Wireshark / tshark",
-        "desc":  "Paket-Analyse – winget install Wireshark",
-        "type":  "winget",
-        "pkg":   "WiresharkFoundation.Wireshark",
-        "path":  r"C:\Program Files\Wireshark\tshark.exe",
-        "default": True,
-    },
-    {
-        "id":    "hashcat",
-        "name":  "hashcat 6.2.6",
-        "desc":  "GPU Hash-Cracker",
-        "type":  "direct",
-        "url":   "https://github.com/hashcat/hashcat/releases/download/v6.2.6/hashcat-6.2.6.7z",
-        "dest":  "hashcat",
-        "exe":   "hashcat/hashcat.exe",
-        "default": True,
-    },
-    {
-        "id":    "gobuster",
-        "name":  "gobuster",
-        "desc":  "Directory-Bruteforce",
-        "type":  "github_release",
-        "repo":  "OJ/gobuster",
-        "asset": "gobuster_windows_amd64.zip",
-        "dest":  "gobuster",
-        "exe":   "gobuster/gobuster.exe",
-        "default": True,
-    },
-    {
-        "id":    "feroxbuster",
-        "name":  "feroxbuster",
-        "desc":  "Rekursiver Dir-Scanner",
-        "type":  "github_release",
-        "repo":  "epi052/feroxbuster",
-        "asset": "x86_64-windows-feroxbuster.exe.zip",
-        "dest":  "feroxbuster",
-        "exe":   "feroxbuster/feroxbuster.exe",
-        "default": True,
-    },
-    {
-        "id":    "john",
-        "name":  "John the Ripper",
-        "desc":  "Password Cracker",
-        "type":  "direct",
-        "url":   "https://github.com/openwall/john-packages/releases/download/jumbo-dev/john-1.9.0-jumbo-1-win64.zip",
-        "dest":  "john",
-        "exe":   "john/run/john.exe",
-        "default": True,
-    },
-    {
-        "id":    "sqlmap",
-        "name":  "sqlmap",
-        "desc":  "SQL-Injection",
-        "type":  "pip",
-        "pkgs":  ["sqlmap"],
-        "default": True,
-    },
-    {
-        "id":    "exploitdb",
-        "name":  "ExploitDB (SearchSploit)",
-        "desc":  "47.000+ Exploits (CSV-Datenbank)",
-        "type":  "git_clone",
-        "url":   "https://gitlab.com/exploit-database/exploitdb.git",
-        "dest":  "exploitdb",
-        "sparse": ["files_exploits.csv", "files_shellcodes.csv"],
-        "exe":   "exploitdb/searchsploit.bat",
-        "default": True,
-    },
-    {
-        "id":    "hydra_builtin",
-        "name":  "Hydra (Python)",
-        "desc":  "Online-Brute-Force (SSH/FTP/HTTP)",
-        "type":  "builtin",
-        "src":   "hydra",
-        "exe":   "hydra/hydra.bat",
-        "default": True,
-    },
-    {
-        "id":    "masscan_builtin",
-        "name":  "Masscan (Python)",
-        "desc":  "Schnell-Port-Scanner",
-        "type":  "builtin",
-        "src":   "masscan",
-        "exe":   "masscan/masscan.bat",
-        "default": True,
-    },
-    {
-        "id":    "whatweb_builtin",
-        "name":  "WhatWeb (Python)",
-        "desc":  "Web-Fingerprinting",
-        "type":  "builtin",
-        "src":   "whatweb",
-        "exe":   "whatweb/whatweb.bat",
-        "default": True,
-    },
-    {
-        "id":    "nikto",
-        "name":  "nikto",
-        "desc":  "Web-Schwachstellen-Scanner (Perl)",
-        "type":  "github_release",
-        "repo":  "sullo/nikto",
-        "asset": "nikto-2.1.6.zip",
-        "dest":  "nikto",
-        "exe":   "nikto/nikto.bat",
-        "default": False,
-    },
-    {
-        "id":    "metasploit",
-        "name":  "Metasploit Framework",
-        "desc":  "~800 MB – nur bei Bedarf",
-        "type":  "winget",
-        "pkg":   "Rapid7.Metasploit",
-        "path":  r"C:\metasploit-framework\bin\msfconsole.bat",
-        "default": False,
-    },
+# Installer-internes Daten-Verzeichnis (PyInstaller: _MEIPASS)
+def _data(rel: str) -> Path:
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).parent.parent))
+    return base / rel
+
+
+# ─── Installations-Schritte ───────────────────────────────────────────────────
+
+class InstallStep:
+    def __init__(self, name: str, desc: str, default: bool = True):
+        self.name    = name
+        self.desc    = desc
+        self.default = default
+        self.var: tk.BooleanVar | None = None
+
+STEPS = [
+    InstallStep("G4MEOVER Suite",        "Hauptprogramm (Python-Skripte + Module)"),
+    InstallStep("Python-Pakete",         "scapy, pillow, requests, pywin32 (pip install)"),
+    InstallStep("gobuster",              "Directory-Bruteforce [eingebettet, ~9 MB]"),
+    InstallStep("feroxbuster",           "Rekursiver Dir-Scanner [eingebettet, ~6 MB]"),
+    InstallStep("John the Ripper",       "Password Cracker [eingebettet, ~7 MB]"),
+    InstallStep("sqlmap",                "SQL-Injection (pip install)"),
+    InstallStep("ExploitDB + SearchSploit","47.000+ Exploits [eingebettet, ~10 MB]"),
+    InstallStep("nikto",                 "Web-Scanner [eingebettet, ~2 MB]"),
+    InstallStep("Hydra (Python)",        "Online-Brute-Force SSH/FTP/HTTP [eingebettet]"),
+    InstallStep("Masscan (Python)",      "Schnell-Port-Scanner [eingebettet]"),
+    InstallStep("WhatWeb (Python)",      "Web-Fingerprinting [eingebettet]"),
+    InstallStep("nmap",                  "Port-Scanner [winget install – Internet nötig]"),
+    InstallStep("Wireshark / tshark",    "Paket-Analyse [winget install – Internet nötig]"),
+    InstallStep("hashcat",               "GPU Hash-Cracker [Download ~35 MB]"),
+    InstallStep("Desktop-Verknüpfung",   "Startet G4MEOVER Suite per Doppelklick"),
+    InstallStep("Startmenü-Eintrag",     "G4MEOVER Suite im Windows-Startmenü"),
 ]
 
-# Builtin-Tools (im Installer gebundelt)
-BUILTIN_FILES = {
-    "hydra": [
-        ("hydra.py",  _HYDRA_PY  := ""),   # wird zur Laufzeit gefüllt
-        ("hydra.bat", "@echo off\npython \"%~dp0hydra.py\" %*\n"),
-    ],
-    "masscan": [
-        ("masscan.py",  ""),
-        ("masscan.bat", "@echo off\npython \"%~dp0masscan.py\" %*\n"),
-    ],
-    "whatweb": [
-        ("whatweb.py",  ""),
-        ("whatweb.bat", "@echo off\npython \"%~dp0whatweb.py\" %*\n"),
-    ],
-}
 
-# searchsploit.py und searchsploit.bat für exploitdb
-SEARCHSPLOIT_PY = r'''#!/usr/bin/env python3
-"""SearchSploit – Python CSV-Wrapper für ExploitDB."""
-import csv, re, sys, os, argparse
-_DIR = os.path.dirname(os.path.abspath(__file__))
-CSV  = os.path.join(_DIR, "files_exploits.csv")
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("terms", nargs="+")
-    ap.add_argument("--exact", action="store_true")
-    args = ap.parse_args()
-    terms = args.terms
-    pat = re.compile(r"\b" + r"\b.*\b".join(re.escape(t) for t in terms) + r"\b", re.I) \
-          if args.exact else re.compile(".*".join(re.escape(t) for t in terms), re.I)
-    if not os.path.exists(CSV):
-        print(f"[!] {CSV} nicht gefunden."); sys.exit(1)
-    hits = 0
-    with open(CSV, newline="", encoding="utf-8", errors="replace") as f:
-        for row in csv.DictReader(f):
-            desc = row.get("description","") or row.get("Title","")
-            path = row.get("file","") or row.get("File","")
-            if pat.search(desc):
-                print(f"{desc} | {path}"); hits += 1
-    print(f"\n{hits} Treffer")
-if __name__ == "__main__": main()
-'''
-
-SEARCHSPLOIT_BAT = "@echo off\npython \"%~dp0searchsploit.py\" %*\n"
-NIKTO_BAT = (
-    "@echo off\n"
-    "set PERL5LIB=%~dp0perl5lib\n"
-    "perl \"%~dp0nikto-main\\program\\nikto.pl\" %*\n"
-)
-
-
-# ─── Download-Helfer ──────────────────────────────────────────────────────────
-
-def _download(url: str, dest: Path, log, progress_cb=None) -> bool:
-    log(f"  ↓  {url.split('/')[-1]}")
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "G4MEOVER-Installer/1.4"})
-        with urllib.request.urlopen(req, timeout=120) as r:
-            total = int(r.headers.get("Content-Length", 0))
-            done  = 0
-            chunk = 65536
-            with open(dest, "wb") as f:
-                while True:
-                    buf = r.read(chunk)
-                    if not buf:
-                        break
-                    f.write(buf)
-                    done += len(buf)
-                    if progress_cb and total:
-                        progress_cb(done / total * 100)
-        return True
-    except Exception as e:
-        log(f"  [!] Download-Fehler: {e}")
-        return False
-
-
-def _get_github_release_url(repo: str, asset_pattern: str) -> str:
-    """Holt die Download-URL des neuesten GitHub-Releases."""
-    api = f"https://api.github.com/repos/{repo}/releases/latest"
-    try:
-        req = urllib.request.Request(api, headers={
-            "User-Agent": "G4MEOVER-Installer",
-            "Accept": "application/vnd.github.v3+json"})
-        with urllib.request.urlopen(req, timeout=15) as r:
-            data = json.loads(r.read())
-        for asset in data.get("assets", []):
-            if re.search(asset_pattern, asset["name"], re.I):
-                return asset["browser_download_url"]
-    except Exception:
-        pass
-    return ""
-
-
-def _unzip(src: Path, dest: Path, log) -> bool:
-    try:
-        with zipfile.ZipFile(src, "r") as z:
-            z.extractall(dest)
-        return True
-    except Exception as e:
-        log(f"  [!] Entpacken fehlgeschlagen: {e}")
-        return False
-
-
-def _run_winget(pkg: str, log) -> bool:
-    log(f"  winget install {pkg}")
-    try:
-        r = subprocess.run(
-            ["winget", "install", "--id", pkg, "-e",
-             "--accept-source-agreements", "--accept-package-agreements",
-             "--silent"],
-            capture_output=True, text=True, timeout=300)
-        if r.returncode == 0 or r.returncode == -1978335189:  # already installed
-            log(f"  ✓ {pkg} installiert")
-            return True
-        log(f"  [!] winget rc={r.returncode}: {r.stderr[:200]}")
-        return False
-    except Exception as e:
-        log(f"  [!] winget: {e}")
-        return False
-
-
-def _run_pip(pkgs: list[str], log) -> bool:
-    log(f"  pip install {' '.join(pkgs)}")
-    try:
-        r = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--quiet"] + pkgs,
-            capture_output=True, text=True, timeout=180)
-        if r.returncode == 0:
-            log(f"  ✓ Pakete installiert")
-            return True
-        log(f"  [!] pip: {r.stderr[:300]}")
-        return False
-    except Exception as e:
-        log(f"  [!] pip: {e}")
-        return False
-
-
-def _git_clone_sparse(url: str, dest: Path, sparse_paths: list[str], log) -> bool:
-    log(f"  git clone (sparse) {url}")
-    try:
-        subprocess.run(["git", "init", str(dest)], check=True,
-                       capture_output=True, timeout=30)
-        subprocess.run(["git", "-C", str(dest), "remote", "add", "origin", url],
-                       check=True, capture_output=True, timeout=10)
-        subprocess.run(["git", "-C", str(dest), "config",
-                        "core.sparseCheckout", "true"],
-                       check=True, capture_output=True, timeout=10)
-        sparse_file = dest / ".git" / "info" / "sparse-checkout"
-        sparse_file.write_text("\n".join(sparse_paths) + "\n")
-        subprocess.run(["git", "-C", str(dest), "pull",
-                        "--depth=1", "origin", "main"],
-                       check=True, capture_output=True, timeout=300)
-        log("  ✓ ExploitDB geklont")
-        return True
-    except Exception as e:
-        log(f"  [!] git clone: {e}")
-        return False
-
-
-# ─── Installer-GUI ────────────────────────────────────────────────────────────
+# ─── Installer ────────────────────────────────────────────────────────────────
 
 class InstallerApp(tk.Tk):
 
     def __init__(self):
         super().__init__()
         self.title(f"{SUITE_NAME} – Setup v{VERSION}")
-        self.geometry("820x620")
+        self.geometry("860x640")
         self.resizable(False, False)
         self.configure(bg=BG)
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._install_dir = tk.StringVar(value=str(DEFAULT_INSTALL))
-        self._tool_vars: dict[str, tk.BooleanVar] = {}
-        self._page = 0
-        self._frames: list[tk.Frame] = []
+        self._page        = 0
+        self._installing  = False
 
-        self._build_ui()
-        self._show_page(0)
+        for step in STEPS:
+            step.var = tk.BooleanVar(value=step.default)
 
-    # ── UI-Aufbau ─────────────────────────────────────────────────────────────
+        self._build()
+        self._show(0)
 
-    def _build_ui(self):
+    def _on_close(self):
+        if self._installing:
+            return
+        self.destroy()
+
+    # ── UI ────────────────────────────────────────────────────────────────────
+
+    def _build(self):
         # Header
-        hdr = tk.Frame(self, bg=PANEL, height=70)
+        hdr = tk.Frame(self, bg=PANEL, height=72)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
         tk.Label(hdr, text=f"  {SUITE_NAME}",
-                 bg=PANEL, fg=ACCENT, font=("Segoe UI", 16, "bold")).pack(
-            side="left", padx=16, pady=10)
-        tk.Label(hdr, text=f"v{VERSION}  ·  by {AUTHOR}",
-                 bg=PANEL, fg=BORDER, font=("Segoe UI", 8)).pack(
-            side="right", padx=16)
+                 bg=PANEL, fg=ACCENT,
+                 font=("Segoe UI", 15, "bold")).pack(side="left", padx=16)
+        tk.Label(hdr, text=f"v{VERSION}  ·  {AUTHOR}",
+                 bg=PANEL, fg=BORDER, font=("Segoe UI", 8)).pack(side="right", padx=16)
 
-        # Content-Bereich
+        self._pages: list[tk.Frame] = []
         self._content = tk.Frame(self, bg=BG)
-        self._content.pack(fill="both", expand=True, padx=0, pady=0)
+        self._content.pack(fill="both", expand=True)
 
-        # Seite 0 – Willkommen
-        p0 = tk.Frame(self._content, bg=BG)
-        self._frames.append(p0)
-
-        tk.Label(p0, text="Willkommen",
-                 bg=BG, fg=FG, font=("Segoe UI", 18, "bold")).pack(pady=(40, 8))
+        # ── Seite 0: Willkommen ───────────────────────────────────────────────
+        p0 = tk.Frame(self._content, bg=BG); self._pages.append(p0)
+        tk.Label(p0, text="Willkommen bei G4MEOVER",
+                 bg=BG, fg=FG, font=("Segoe UI", 17, "bold")).pack(pady=(36, 10))
         tk.Label(p0,
-                 text=(
-                     f"Dieser Assistent installiert {SUITE_NAME}\n"
-                     "und alle benötigten Sicherheitstools\n"
-                     "auf diesem Windows-System.\n\n"
-                     "Benötigt: Windows 10/11 · Internetverbindung\n"
-                     "Administratorrechte empfohlen (für nmap, Wireshark)"
-                 ),
-                 bg=BG, fg=FG, font=("Segoe UI", 11),
-                 justify="center").pack(pady=8)
-
+            text="Dieser Assistent richtet die G4MEOVER Security Suite ein –\n"
+                 "inklusive aller Sicherheitstools, direkt einsatzbereit.\n\n"
+                 "Die meisten Tools sind bereits im Installer eingebettet.\n"
+                 "Nur nmap, Wireshark und hashcat werden nachgeladen.\n\n"
+                 "Empfohlen: Ausführen als Administrator",
+            bg=BG, fg=FG, font=("Segoe UI", 11), justify="center").pack(pady=6)
+        tk.Label(p0,
+            text="⚠  Nur für autorisierte Sicherheitstests und CTF-Challenges!",
+            bg=BG, fg=YELLOW, font=("Segoe UI", 9, "bold")).pack(pady=(14, 0))
         tk.Label(p0, text=GITHUB, bg=BG, fg=ACCENT,
-                 font=("Segoe UI", 9, "underline"), cursor="hand2").pack(pady=4)
+                 font=("Segoe UI", 8, "underline")).pack(pady=2)
 
-        tk.Label(p0,
-                 text="⚠  Nur für autorisierte Sicherheitstests und CTF-Challenges verwenden.",
-                 bg=BG, fg=YELLOW, font=("Segoe UI", 8)).pack(pady=(16, 4))
-
-        # Seite 1 – Installationspfad
-        p1 = tk.Frame(self._content, bg=BG)
-        self._frames.append(p1)
-
+        # ── Seite 1: Pfad ─────────────────────────────────────────────────────
+        p1 = tk.Frame(self._content, bg=BG); self._pages.append(p1)
         tk.Label(p1, text="Installationspfad",
-                 bg=BG, fg=FG, font=("Segoe UI", 14, "bold")).pack(pady=(30, 12))
-        tk.Label(p1,
-                 text="Die Suite und alle Tools werden in diesen Ordner installiert:",
+                 bg=BG, fg=FG, font=("Segoe UI", 14, "bold")).pack(pady=(28, 8))
+        tk.Label(p1, text="Alle Dateien werden in diesen Ordner installiert:",
                  bg=BG, fg=BORDER, font=("Segoe UI", 9)).pack()
-
-        path_row = tk.Frame(p1, bg=BG); path_row.pack(pady=12, padx=40, fill="x")
-        tk.Entry(path_row, textvariable=self._install_dir,
+        prow = tk.Frame(p1, bg=BG); prow.pack(fill="x", padx=50, pady=12)
+        tk.Entry(prow, textvariable=self._install_dir,
                  bg=PANEL, fg=FG, insertbackground=FG,
                  relief="flat", font=("Consolas", 10)).pack(
             side="left", fill="x", expand=True, ipady=6, padx=(0, 8))
-        tk.Button(path_row, text="…",
-                  bg=PANEL, fg=FG, relief="flat", cursor="hand2",
-                  command=self._browse_dir).pack(side="left", ipadx=8, ipady=4)
+        tk.Button(prow, text="…", bg=PANEL, fg=FG, relief="flat",
+                  cursor="hand2", command=self._browse,
+                  padx=10, pady=4).pack(side="left")
 
-        tk.Label(p1, text="Außerdem wird eine Desktop-Verknüpfung erstellt.",
-                 bg=BG, fg=BORDER, font=("Segoe UI", 9)).pack(pady=4)
-
-        # Speicherplatz-Info
-        info_frame = tk.Frame(p1, bg=PANEL, padx=20, pady=12)
-        info_frame.pack(padx=40, pady=16, fill="x")
-        for label, val in [
-            ("G4MEOVER Suite:", "~15 MB"),
-            ("nmap:", "~30 MB"),
-            ("hashcat:", "~40 MB"),
-            ("Wireshark:", "~120 MB"),
-            ("ExploitDB (CSV):", "~50 MB"),
-            ("Sonstige Tools:", "~100 MB"),
-            ("Gesamt ca.:", "~355 MB"),
-        ]:
-            row = tk.Frame(info_frame, bg=PANEL); row.pack(fill="x")
-            tk.Label(row, text=label, bg=PANEL, fg=BORDER,
-                     font=("Segoe UI", 8), width=22, anchor="w").pack(side="left")
-            tk.Label(row, text=val, bg=PANEL, fg=FG,
+        # Größen-Info
+        info = tk.Frame(p1, bg=PANEL, padx=24, pady=14)
+        info.pack(padx=50, pady=10, fill="x")
+        sizes = [
+            ("Eingebettet (offline):", "~35 MB"),
+            ("nmap (winget):",         "~30 MB"),
+            ("Wireshark (winget):",    "~120 MB"),
+            ("hashcat (Download):",    "~35 MB"),
+            ("Gesamt ca.:",            "~220 MB"),
+        ]
+        for label, val in sizes:
+            r = tk.Frame(info, bg=PANEL); r.pack(fill="x", pady=1)
+            tk.Label(r, text=label, bg=PANEL, fg=BORDER,
+                     font=("Segoe UI", 8), width=24, anchor="w").pack(side="left")
+            tk.Label(r, text=val, bg=PANEL, fg=FG,
                      font=("Segoe UI", 8, "bold")).pack(side="left")
 
-        # Seite 2 – Tool-Auswahl
-        p2 = tk.Frame(self._content, bg=BG)
-        self._frames.append(p2)
+        tk.Label(p1,
+            text="Tipp: Verwende C:\\tools\\G4MEOVER  oder  D:\\G4MEOVER",
+            bg=BG, fg=BORDER, font=("Segoe UI", 8, "italic")).pack(pady=4)
 
-        tk.Label(p2, text="Tool-Auswahl",
-                 bg=BG, fg=FG, font=("Segoe UI", 14, "bold")).pack(pady=(20, 6))
-        tk.Label(p2, text="Wähle welche Tools installiert werden sollen:",
+        # ── Seite 2: Auswahl ──────────────────────────────────────────────────
+        p2 = tk.Frame(self._content, bg=BG); self._pages.append(p2)
+        tk.Label(p2, text="Komponenten",
+                 bg=BG, fg=FG, font=("Segoe UI", 14, "bold")).pack(pady=(18, 4))
+        tk.Label(p2, text="Wähle welche Komponenten installiert werden:",
                  bg=BG, fg=BORDER, font=("Segoe UI", 9)).pack(pady=(0, 8))
 
-        scroll_frame = tk.Frame(p2, bg=BG); scroll_frame.pack(fill="both", expand=True, padx=40)
-        canvas = tk.Canvas(scroll_frame, bg=BG, highlightthickness=0)
-        sb     = ttk.Scrollbar(scroll_frame, command=canvas.yview)
-        canvas.configure(yscrollcommand=sb.set)
+        sf = tk.Frame(p2, bg=BG); sf.pack(fill="both", expand=True, padx=50)
+        cv = tk.Canvas(sf, bg=BG, highlightthickness=0)
+        sb = ttk.Scrollbar(sf, command=cv.yview)
+        cv.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
-        inner = tk.Frame(canvas, bg=BG)
-        canvas.create_window((0, 0), window=inner, anchor="nw")
-        inner.bind("<Configure>", lambda e: canvas.configure(
-            scrollregion=canvas.bbox("all")))
+        cv.pack(side="left", fill="both", expand=True)
+        inner = tk.Frame(cv, bg=BG)
+        cv.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>",
+                   lambda e: cv.configure(scrollregion=cv.bbox("all")))
 
-        for tool in TOOLS:
-            var = tk.BooleanVar(value=tool["default"])
-            self._tool_vars[tool["id"]] = var
-            row = tk.Frame(inner, bg=BG); row.pack(fill="x", pady=2)
-            cb = tk.Checkbutton(row, variable=var, bg=BG, fg=FG,
-                                activebackground=BG, activeforeground=ACCENT,
-                                selectcolor=PANEL, relief="flat",
-                                font=("Segoe UI", 9, "bold"),
-                                text=f"  {tool['name']}")
-            cb.pack(side="left")
-            tk.Label(row, text=f"   – {tool['desc']}",
-                     bg=BG, fg=BORDER, font=("Segoe UI", 8)).pack(side="left")
+        for step in STEPS:
+            embedded = "[eingebettet]" in step.desc or "pip install" in step.desc
+            color    = GREEN if embedded else YELLOW
+            row = tk.Frame(inner, bg=BG); row.pack(fill="x", pady=3)
+            tk.Checkbutton(row, variable=step.var,
+                           bg=BG, fg=FG, activebackground=BG,
+                           activeforeground=ACCENT, selectcolor=PANEL,
+                           relief="flat", font=("Segoe UI", 9, "bold"),
+                           text=f"  {step.name}").pack(side="left")
+            tk.Label(row, text=f"  {step.desc}",
+                     bg=BG, fg=color,
+                     font=("Segoe UI", 7, "italic")).pack(side="left")
 
-        # Seite 3 – Installation
-        p3 = tk.Frame(self._content, bg=BG)
-        self._frames.append(p3)
+        leg = tk.Frame(p2, bg=BG); leg.pack(pady=6)
+        tk.Label(leg, text="  [eingebettet] = offline  ",
+                 bg=BG, fg=GREEN, font=("Segoe UI", 7, "italic")).pack(side="left")
+        tk.Label(leg, text="  [winget/Download] = Internet nötig",
+                 bg=BG, fg=YELLOW, font=("Segoe UI", 7, "italic")).pack(side="left")
 
-        tk.Label(p3, text="Installation läuft...",
-                 bg=BG, fg=FG, font=("Segoe UI", 14, "bold")).pack(pady=(20, 8))
-        self._current_tool_var = tk.StringVar(value="")
-        tk.Label(p3, textvariable=self._current_tool_var,
-                 bg=BG, fg=ACCENT, font=("Segoe UI", 9)).pack()
+        # ── Seite 3: Fortschritt ──────────────────────────────────────────────
+        p3 = tk.Frame(self._content, bg=BG); self._pages.append(p3)
+        self._status_var = tk.StringVar(value="Initialisiere...")
+        tk.Label(p3, text="Installation läuft",
+                 bg=BG, fg=FG, font=("Segoe UI", 14, "bold")).pack(pady=(18, 4))
+        tk.Label(p3, textvariable=self._status_var,
+                 bg=BG, fg=ACCENT, font=("Segoe UI", 9)).pack(pady=(0, 4))
+        self._pb = ttk.Progressbar(p3, length=740, mode="determinate")
+        self._pb.pack(padx=40, pady=(0, 8))
+        self._log = tk.Text(p3, height=15, width=95,
+                             bg=PANEL, fg=FG, relief="flat",
+                             font=("Consolas", 8), state="disabled")
+        self._log.tag_configure("ok",   foreground=GREEN)
+        self._log.tag_configure("err",  foreground=RED)
+        self._log.tag_configure("head", foreground=ACCENT)
+        self._log.tag_configure("warn", foreground=YELLOW)
+        self._log.pack(padx=40, fill="both", expand=True)
 
-        self._progress = ttk.Progressbar(p3, length=700, mode="determinate")
-        self._progress.pack(padx=40, pady=8)
-
-        self._log_text = tk.Text(p3, height=14, width=90,
-                                  bg=PANEL, fg=FG, relief="flat",
-                                  font=("Consolas", 8), state="disabled",
-                                  insertbackground=FG)
-        self._log_text.tag_configure("ok",   foreground=GREEN)
-        self._log_text.tag_configure("err",  foreground=RED)
-        self._log_text.tag_configure("head", foreground=ACCENT)
-        self._log_text.pack(padx=40, pady=4, fill="both", expand=True)
-
-        # Seite 4 – Fertig
-        p4 = tk.Frame(self._content, bg=BG)
-        self._frames.append(p4)
-
-        self._done_icon = tk.Label(p4, text="✓", bg=BG, fg=GREEN,
-                                    font=("Segoe UI", 48))
-        self._done_icon.pack(pady=(50, 10))
+        # ── Seite 4: Fertig ───────────────────────────────────────────────────
+        p4 = tk.Frame(self._content, bg=BG); self._pages.append(p4)
         tk.Label(p4, text="Installation abgeschlossen!",
-                 bg=BG, fg=GREEN, font=("Segoe UI", 16, "bold")).pack()
-        self._done_msg = tk.Label(p4, text="",
-                                   bg=BG, fg=FG, font=("Segoe UI", 10),
-                                   justify="center")
-        self._done_msg.pack(pady=12)
-        tk.Button(p4, text="Suite starten",
-                  bg=ACCENT, fg=BG, relief="flat",
-                  font=("Segoe UI", 11, "bold"), cursor="hand2",
-                  command=self._launch_suite,
-                  padx=20, pady=8).pack(pady=8)
+                 bg=BG, fg=GREEN, font=("Segoe UI", 18, "bold")).pack(pady=(60, 12))
+        self._done_lbl = tk.Label(p4, text="",
+                                   bg=BG, fg=FG, font=("Segoe UI", 10), justify="center")
+        self._done_lbl.pack(pady=8)
+        tk.Button(p4, text="Suite jetzt starten",
+                  bg=GREEN, fg=BG, relief="flat", cursor="hand2",
+                  font=("Segoe UI", 12, "bold"), padx=24, pady=10,
+                  command=self._launch).pack(pady=12)
 
-        # Navigations-Leiste
-        nav = tk.Frame(self, bg=PANEL, height=54)
+        # Nav-Bar
+        nav = tk.Frame(self, bg=PANEL, height=56)
         nav.pack(fill="x", side="bottom")
         nav.pack_propagate(False)
-
-        self._back_btn = tk.Button(nav, text="← Zurück",
-                                    bg=PANEL, fg=FG, relief="flat",
-                                    font=("Segoe UI", 10), cursor="hand2",
-                                    command=self._prev_page,
-                                    padx=16, pady=8)
-        self._back_btn.pack(side="left", padx=16, pady=8)
-
-        self._next_btn = tk.Button(nav, text="Weiter →",
-                                    bg=ACCENT, fg=BG, relief="flat",
-                                    font=("Segoe UI", 10, "bold"), cursor="hand2",
-                                    command=self._next_page,
-                                    padx=20, pady=8)
-        self._next_btn.pack(side="right", padx=16, pady=8)
-
-        # Seitennummer
-        self._page_lbl = tk.Label(nav, text="",
-                                   bg=PANEL, fg=BORDER, font=("Segoe UI", 8))
-        self._page_lbl.pack(side="right", padx=8)
+        self._back = tk.Button(nav, text="< Zurück", bg=PANEL, fg=FG,
+                               relief="flat", font=("Segoe UI", 10),
+                               cursor="hand2", padx=16, pady=8,
+                               command=self._prev)
+        self._back.pack(side="left", padx=16, pady=8)
+        self._pgnum = tk.Label(nav, text="", bg=PANEL, fg=BORDER,
+                               font=("Segoe UI", 8))
+        self._pgnum.pack(side="right", padx=8)
+        self._next = tk.Button(nav, text="Weiter >", bg=ACCENT, fg=BG,
+                               relief="flat", font=("Segoe UI", 10, "bold"),
+                               cursor="hand2", padx=20, pady=8,
+                               command=self._next_page)
+        self._next.pack(side="right", padx=16, pady=8)
 
     # ── Navigation ────────────────────────────────────────────────────────────
 
-    def _show_page(self, idx: int):
-        for f in self._frames:
-            f.pack_forget()
-        self._frames[idx].pack(fill="both", expand=True)
+    def _show(self, idx: int):
+        for p in self._pages:
+            p.pack_forget()
+        self._pages[idx].pack(fill="both", expand=True)
         self._page = idx
-        total = len(self._frames)
-        self._page_lbl.configure(text=f"Schritt {idx + 1} / {total}")
-
-        self._back_btn.configure(state="normal" if idx > 0 else "disabled")
-
-        labels = ["Weiter →", "Weiter →", "Installieren", "Läuft...", "Schließen"]
-        self._next_btn.configure(text=labels[min(idx, len(labels) - 1)])
-
+        n = len(self._pages)
+        self._pgnum.configure(text=f"Schritt {idx+1} / {n}")
+        self._back.configure(state="normal" if idx > 0 else "disabled")
+        labels = ["Weiter >", "Weiter >", "Installieren", "...", "Schliessen"]
+        self._next.configure(text=labels[min(idx, len(labels)-1)],
+                             state="disabled" if idx == 3 else "normal")
         if idx == 4:
-            self._back_btn.configure(state="disabled")
-            self._next_btn.configure(text="Schließen", command=self.destroy,
-                                      bg=GREEN, fg=BG)
+            self._back.configure(state="disabled")
+            self._next.configure(text="Schliessen", bg=GREEN, fg=BG,
+                                  command=self.destroy, state="normal")
 
     def _next_page(self):
         if self._page == 2:
-            self._show_page(3)
-            threading.Thread(target=self._run_install, daemon=True).start()
-        elif self._page < len(self._frames) - 1:
-            self._show_page(self._page + 1)
+            self._show(3)
+            self._installing = True
+            threading.Thread(target=self._install, daemon=True).start()
+        elif self._page < len(self._pages) - 1:
+            self._show(self._page + 1)
 
-    def _prev_page(self):
-        if self._page > 0:
-            self._show_page(self._page - 1)
+    def _prev(self):
+        if self._page > 0 and not self._installing:
+            self._show(self._page - 1)
 
-    def _browse_dir(self):
-        d = filedialog.askdirectory(title="Installationsordner wählen",
-                                    initialdir=self._install_dir.get())
+    def _browse(self):
+        d = filedialog.askdirectory(initialdir=self._install_dir.get())
         if d:
             self._install_dir.set(d)
 
-    # ── Installation ──────────────────────────────────────────────────────────
+    # ── Logging ───────────────────────────────────────────────────────────────
 
-    def _log(self, text: str, tag: str = ""):
+    def _w(self, text: str, tag: str = ""):
         def _do():
-            self._log_text.configure(state="normal")
-            self._log_text.insert("end", text + "\n", tag if tag else ())
-            self._log_text.see("end")
-            self._log_text.configure(state="disabled")
+            self._log.configure(state="normal")
+            self._log.insert("end", text + "\n", tag or ())
+            self._log.see("end")
+            self._log.configure(state="disabled")
         self.after(0, _do)
 
-    def _set_progress(self, pct: float):
-        self.after(0, lambda: self._progress.configure(value=pct))
+    def _prog(self, pct: float, status: str = ""):
+        self.after(0, lambda: self._pb.configure(value=pct))
+        if status:
+            self.after(0, lambda: self._status_var.set(status))
 
-    def _set_current(self, text: str):
-        self.after(0, lambda: self._current_tool_var.set(text))
+    # ── Installations-Logik ───────────────────────────────────────────────────
 
-    def _run_install(self):
-        install_dir = Path(self._install_dir.get())
-        install_dir.mkdir(parents=True, exist_ok=True)
-        suite_dir   = install_dir / "suite"
-        tools_dir   = install_dir / "tools"
-        tools_dir.mkdir(parents=True, exist_ok=True)
+    def _selected(self, name: str) -> bool:
+        for s in STEPS:
+            if s.name == name:
+                return bool(s.var and s.var.get())
+        return False
 
-        selected = [t for t in TOOLS if self._tool_vars.get(t["id"], tk.BooleanVar()).get()]
-        total    = len(selected) + 3   # +3 für Suite-Kopie, Config, Shortcut
-        done     = 0
-        cfg      = {}
+    def _install(self):
+        base   = Path(self._install_dir.get())
+        suite  = base / "suite"
+        tools  = base / "tools"
+        base.mkdir(parents=True, exist_ok=True)
+        suite.mkdir(parents=True, exist_ok=True)
+        tools.mkdir(parents=True, exist_ok=True)
 
-        def step(name: str):
+        cfg: dict = {}
+        total_steps = sum(1 for s in STEPS if s.var and s.var.get())
+        done = 0
+
+        def step_done(name: str):
             nonlocal done
             done += 1
-            self._set_current(f"[{done}/{total}]  {name}")
-            self._set_progress(done / total * 100)
-            self._log(f"\n── {name}", "head")
+            self._prog(done / max(total_steps, 1) * 100, name)
 
-        # 1. Suite-Dateien kopieren
-        step("G4MEOVER Suite kopieren")
-        src_suite = Path(__file__).parent.parent   # installer/ → suite/
-        if src_suite.exists():
-            if suite_dir.exists():
-                shutil.rmtree(suite_dir)
-            shutil.copytree(str(src_suite), str(suite_dir),
-                            ignore=shutil.ignore_patterns(
-                                "__pycache__", "*.pyc", "build", "dist",
-                                ".git", "installer"))
-            self._log("  ✓ Suite-Dateien kopiert", "ok")
-        else:
-            # Fallback: direkt aus GitHub klonen
-            self._log("  Klone von GitHub...")
+        # ── 1. Suite-Dateien ─────────────────────────────────────────────────
+        if self._selected("G4MEOVER Suite"):
+            self._w("\n=== G4MEOVER Suite ===", "head")
+            # Im gebundeten EXE: Daten in _MEIPASS/suite/
+            src = _data("suite")
+            if not src.exists():
+                src = _data(".")   # Fallback: direkt im Bundle
+
+            if src.exists():
+                self._w(f"  Kopiere von {src}...")
+                try:
+                    if suite.exists():
+                        shutil.rmtree(suite)
+                    shutil.copytree(str(src), str(suite),
+                                    ignore=shutil.ignore_patterns(
+                                        "__pycache__", "*.pyc", "build",
+                                        ".git", "installer"))
+                    self._w("  Suite-Dateien kopiert", "ok")
+                except Exception as e:
+                    self._w(f"  Fehler: {e}", "err")
+            else:
+                # Online-Fallback: von GitHub klonen
+                self._w("  Klone von GitHub...")
+                try:
+                    subprocess.run(
+                        ["git", "clone", "--depth=1",
+                         "https://github.com/G4MEOVER18/g4meover-security-suite.git",
+                         str(suite)],
+                        check=True, capture_output=True, timeout=180)
+                    self._w("  Geklont", "ok")
+                except Exception as e:
+                    self._w(f"  Fehler: {e}", "err")
+            step_done("Suite kopiert")
+
+        # ── 2. Python-Pakete ─────────────────────────────────────────────────
+        if self._selected("Python-Pakete"):
+            self._w("\n=== Python-Pakete ===", "head")
+            pkgs = ["scapy", "pillow", "requests", "pywin32"]
+            self._w(f"  pip install {' '.join(pkgs)}")
             try:
-                subprocess.run(
-                    ["git", "clone", "--depth=1",
-                     "https://github.com/G4MEOVER18/g4meover-security-suite.git",
-                     str(suite_dir)],
-                    check=True, capture_output=True, timeout=180)
-                self._log("  ✓ Geklont", "ok")
+                r = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "--quiet"] + pkgs,
+                    capture_output=True, text=True, timeout=300)
+                if r.returncode == 0:
+                    self._w("  Pakete installiert", "ok")
+                else:
+                    self._w(f"  pip-Fehler: {r.stderr[:200]}", "err")
             except Exception as e:
-                self._log(f"  [!] Fehler: {e}", "err")
+                self._w(f"  Fehler: {e}", "err")
+            step_done("Python-Pakete")
 
-        # 2. Tools installieren
-        for tool in selected:
-            tid  = tool["id"]
-            step(tool["name"])
+        # ── 3. Eingebettete Binaries ──────────────────────────────────────────
+        embedded_tools = [
+            ("gobuster",    "gobuster",   "gobuster.exe",  "tool_gobuster"),
+            ("feroxbuster", "feroxbuster","feroxbuster.exe","tool_feroxbuster"),
+        ]
+        for step_name, folder, exe_name, cfg_key in embedded_tools:
+            if not self._selected(step_name if step_name != "gobuster" else "gobuster"):
+                continue
+            # Passenden Step finden
+            match = next((s for s in STEPS if s.name.lower().startswith(folder)), None)
+            if match and not match.var.get():
+                continue
+            self._w(f"\n=== {step_name} ===", "head")
+            src = _data(f"tools_builtin/{folder}")
+            dest = tools / folder
+            dest.mkdir(parents=True, exist_ok=True)
+            if src.exists():
+                for f in src.iterdir():
+                    shutil.copy2(f, dest / f.name)
+                exe = dest / exe_name
+                if exe.exists():
+                    cfg[cfg_key] = str(exe)
+                    self._w(f"  {exe_name} installiert", "ok")
+                else:
+                    self._w(f"  EXE nicht gefunden: {exe_name}", "warn")
+            else:
+                self._w(f"  Quelle nicht gefunden: {src}", "warn")
+            step_done(step_name)
 
-            if tool["type"] == "pip":
-                ok = _run_pip(tool["pkgs"], self._log)
-                self._log(("  ✓" if ok else "  ✗") + f" {tool['name']}", "ok" if ok else "err")
+        # gobuster
+        if self._selected("gobuster"):
+            self._w("\n=== gobuster ===", "head")
+            src = _data("tools_builtin/gobuster")
+            dest = tools / "gobuster"; dest.mkdir(parents=True, exist_ok=True)
+            if src.exists():
+                for f in src.iterdir():
+                    shutil.copy2(f, dest / f.name)
+                exe = dest / "gobuster.exe"
+                if exe.exists():
+                    cfg["tool_gobuster"] = str(exe)
+                    self._w("  gobuster.exe installiert", "ok")
+            else:
+                self._w("  Quelle fehlt – uebersprungen", "warn")
+            step_done("gobuster")
 
-            elif tool["type"] == "winget":
-                ok = _run_winget(tool["pkg"], self._log)
-                if ok and "path" in tool and os.path.exists(tool["path"]):
-                    cfg[f"tool_{tid}"] = tool["path"]
-                self._log(("  ✓" if ok else "  ✗") + f" {tool['name']}", "ok" if ok else "err")
+        # feroxbuster
+        if self._selected("feroxbuster"):
+            self._w("\n=== feroxbuster ===", "head")
+            src = _data("tools_builtin/feroxbuster")
+            dest = tools / "feroxbuster"; dest.mkdir(parents=True, exist_ok=True)
+            if src.exists():
+                for f in src.iterdir():
+                    shutil.copy2(f, dest / f.name)
+                exe = dest / "feroxbuster.exe"
+                if exe.exists():
+                    cfg["tool_feroxbuster"] = str(exe)
+                    self._w("  feroxbuster.exe installiert", "ok")
+            else:
+                self._w("  Quelle fehlt – uebersprungen", "warn")
+            step_done("feroxbuster")
 
-            elif tool["type"] == "github_release":
-                dest_dir = tools_dir / tool["dest"]
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                url = _get_github_release_url(tool["repo"], tool["asset"])
-                if not url:
-                    self._log(f"  [!] Release-URL nicht gefunden für {tool['repo']}", "err")
-                    continue
-                tmp = tools_dir / "_tmp.zip"
-                ok  = _download(url, tmp, self._log,
-                                lambda p: self._set_progress(done / total * 100 + p / total))
-                if ok:
-                    _unzip(tmp, dest_dir, self._log)
-                    tmp.unlink(missing_ok=True)
-                    exe = install_dir / tool["exe"]
-                    # Flat-Extrakt: bin in Unterordner suchen
-                    if not exe.exists():
-                        for f in dest_dir.rglob(exe.name):
-                            shutil.copy2(f, dest_dir / exe.name)
-                            break
-                    if (install_dir / tool["exe"]).exists():
-                        cfg[f"tool_{tid}"] = str(install_dir / tool["exe"])
-                        self._log(f"  ✓ {tool['name']}", "ok")
+        # John the Ripper
+        if self._selected("John the Ripper"):
+            self._w("\n=== John the Ripper ===", "head")
+            src = _data("tools_builtin/john")
+            dest = tools / "john"; dest.mkdir(parents=True, exist_ok=True)
+            if src.exists():
+                for f in src.rglob("*"):
+                    rel = f.relative_to(src)
+                    if f.is_dir():
+                        (dest / rel).mkdir(parents=True, exist_ok=True)
                     else:
-                        self._log(f"  [!] EXE nicht gefunden: {tool['exe']}", "err")
+                        shutil.copy2(f, dest / rel)
+                exe = dest / "john.exe"
+                if not exe.exists():
+                    for found in dest.rglob("john.exe"):
+                        exe = found; break
+                if exe.exists():
+                    cfg["tool_john"] = str(exe)
+                    self._w("  john.exe installiert", "ok")
+            else:
+                self._w("  Quelle fehlt – uebersprungen", "warn")
+            step_done("John the Ripper")
+
+        # sqlmap
+        if self._selected("sqlmap"):
+            self._w("\n=== sqlmap ===", "head")
+            self._w("  pip install sqlmap")
+            try:
+                r = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "--quiet", "sqlmap"],
+                    capture_output=True, text=True, timeout=120)
+                if r.returncode == 0:
+                    # sqlmap.exe im Scripts-Verzeichnis suchen
+                    scripts = Path(sys.executable).parent / "Scripts" / "sqlmap.exe"
+                    if scripts.exists():
+                        cfg["tool_sqlmap"] = str(scripts)
+                    self._w("  sqlmap installiert", "ok")
                 else:
-                    self._log(f"  ✗ Download fehlgeschlagen", "err")
+                    self._w(f"  Fehler: {r.stderr[:150]}", "err")
+            except Exception as e:
+                self._w(f"  Fehler: {e}", "err")
+            step_done("sqlmap")
 
-            elif tool["type"] == "direct":
-                dest_dir = tools_dir / tool["dest"]
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                fname = tool["url"].split("/")[-1]
-                tmp   = tools_dir / fname
-                ok    = _download(tool["url"], tmp, self._log)
-                if ok:
-                    if fname.endswith(".zip"):
-                        _unzip(tmp, dest_dir, self._log)
-                        tmp.unlink(missing_ok=True)
-                    elif fname.endswith(".7z"):
-                        self._log("  [!] 7z: bitte manuell entpacken nach " + str(dest_dir), "err")
-                    exe_path = tools_dir / tool["exe"]
-                    if exe_path.exists():
-                        cfg[f"tool_{tid}"] = str(exe_path)
-                        self._log(f"  ✓ {tool['name']}", "ok")
+        # ExploitDB
+        if self._selected("ExploitDB + SearchSploit"):
+            self._w("\n=== ExploitDB ===", "head")
+            src = _data("tools_builtin/exploitdb")
+            dest = tools / "exploitdb"; dest.mkdir(parents=True, exist_ok=True)
+            if src.exists():
+                for f in src.iterdir():
+                    shutil.copy2(f, dest / f.name)
+                bat = dest / "searchsploit.bat"
+                cfg["tool_searchsploit"] = str(bat)
+                csv = dest / "files_exploits.csv"
+                self._w(f"  ExploitDB: {csv.stat().st_size//1024}KB CSV + Scripts", "ok")
+            else:
+                self._w("  Quelle fehlt – uebersprungen", "warn")
+            step_done("ExploitDB + SearchSploit")
 
-            elif tool["type"] == "git_clone":
-                dest_dir = tools_dir / tool["dest"]
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                ok = _git_clone_sparse(tool["url"], dest_dir,
-                                        tool.get("sparse", []), self._log)
-                if ok:
-                    # searchsploit.py + .bat schreiben
-                    (dest_dir / "searchsploit.py").write_text(SEARCHSPLOIT_PY, encoding="utf-8")
-                    (dest_dir / "searchsploit.bat").write_text(SEARCHSPLOIT_BAT)
-                    cfg["tool_searchsploit"] = str(dest_dir / "searchsploit.bat")
-                    self._log(f"  ✓ ExploitDB", "ok")
+        # nikto
+        if self._selected("nikto"):
+            self._w("\n=== nikto ===", "head")
+            src = _data("tools_builtin/nikto")
+            dest = tools / "nikto"; dest.mkdir(parents=True, exist_ok=True)
+            if src.exists():
+                for f in src.rglob("*"):
+                    rel = f.relative_to(src)
+                    if f.is_dir():
+                        (dest / rel).mkdir(parents=True, exist_ok=True)
+                    else:
+                        shutil.copy2(f, dest / rel)
+                bat = dest / "nikto.bat"
+                if bat.exists():
+                    cfg["tool_nikto"] = str(bat)
+                    self._w("  nikto installiert", "ok")
+            else:
+                self._w("  Quelle fehlt – uebersprungen", "warn")
+            step_done("nikto")
 
-            elif tool["type"] == "builtin":
-                src_name = tool["src"]
-                dest_dir = tools_dir / src_name
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                # Python-Dateien aus Suite-Quellen kopieren
-                suite_tool_dir = Path(__file__).parent.parent.parent / "tools" / src_name
-                if not suite_tool_dir.exists():
-                    # Versuche aus bekanntem Pfad
-                    suite_tool_dir = Path(r"C:\tools") / src_name
-                ok = False
-                if suite_tool_dir.exists():
-                    for f in suite_tool_dir.iterdir():
-                        shutil.copy2(f, dest_dir / f.name)
-                    ok = True
+        # Python-Tools (hydra / masscan / whatweb)
+        for step_name, folder, cfg_key in [
+            ("Hydra (Python)",    "hydra",    "tool_hydra"),
+            ("Masscan (Python)",  "masscan",  "tool_masscan"),
+            ("WhatWeb (Python)",  "whatweb",  "tool_whatweb"),
+        ]:
+            if not self._selected(step_name):
+                continue
+            self._w(f"\n=== {step_name} ===", "head")
+            src = _data(f"tools_builtin/{folder}")
+            dest = tools / folder; dest.mkdir(parents=True, exist_ok=True)
+            if src.exists():
+                for f in src.iterdir():
+                    shutil.copy2(f, dest / f.name)
+                bat = dest / f"{folder}.bat"
+                if bat.exists():
+                    cfg[cfg_key] = str(bat)
+                    self._w(f"  {folder} installiert", "ok")
+            else:
+                self._w(f"  Quelle fehlt – uebersprungen", "warn")
+            step_done(step_name)
+
+        # ── 4. winget-Tools ───────────────────────────────────────────────────
+        winget_tools = [
+            ("nmap",           "Insecure.Nmap",          "tool_nmap",
+             r"C:\Program Files (x86)\Nmap\nmap.exe"),
+            ("Wireshark / tshark","WiresharkFoundation.Wireshark","tool_tshark",
+             r"C:\Program Files\Wireshark\tshark.exe"),
+        ]
+        for step_name, pkg, cfg_key, default_path in winget_tools:
+            if not self._selected(step_name):
+                continue
+            self._w(f"\n=== {step_name} ===", "head")
+            self._w(f"  winget install {pkg}")
+            try:
+                r = subprocess.run(
+                    ["winget", "install", "--id", pkg, "-e",
+                     "--accept-source-agreements",
+                     "--accept-package-agreements", "--silent"],
+                    capture_output=True, text=True, timeout=300)
+                if r.returncode in (0, -1978335189):
+                    if os.path.exists(default_path):
+                        cfg[cfg_key] = default_path
+                    self._w(f"  {step_name} installiert", "ok")
                 else:
-                    # .bat Wrapper anlegen (ohne .py – manuell nachliefern)
-                    bat = dest_dir / f"{src_name}.bat"
-                    bat.write_text(f"@echo off\npython \"%~dp0{src_name}.py\" %*\n")
-                    ok = True
-                if ok:
-                    exe_path = tools_dir / tool["exe"]
-                    cfg[f"tool_{src_name}"] = str(exe_path)
-                    self._log(f"  ✓ {tool['name']} (builtin)", "ok")
+                    self._w(f"  Fehler rc={r.returncode}: {r.stderr[:120]}", "err")
+            except Exception as e:
+                self._w(f"  Fehler: {e}", "err")
+            step_done(step_name)
 
-        # 3. suite_config.json schreiben
-        step("Konfiguration schreiben")
-        cfg["workspace"] = str(install_dir / "pentest")
+        # ── 5. hashcat (Download) ─────────────────────────────────────────────
+        if self._selected("hashcat"):
+            self._w("\n=== hashcat ===", "head")
+            dest = tools / "hashcat"; dest.mkdir(parents=True, exist_ok=True)
+
+            # Versuche zuerst eingebettet
+            src = _data("tools_builtin/hashcat")
+            if src.exists():
+                self._w("  Kopiere eingebettetes hashcat...")
+                for f in src.rglob("*"):
+                    rel = f.relative_to(src)
+                    if f.is_dir():
+                        (dest / rel).mkdir(parents=True, exist_ok=True)
+                    else:
+                        shutil.copy2(f, dest / rel)
+            else:
+                # Download von GitHub
+                url = ("https://github.com/hashcat/hashcat/releases/download/"
+                       "v6.2.6/hashcat-6.2.6.7z")
+                self._w(f"  Download: {url.split('/')[-1]}")
+                tmp = tools / "hashcat.7z"
+                try:
+                    req = urllib.request.Request(
+                        url, headers={"User-Agent": "G4MEOVER-Installer"})
+                    with urllib.request.urlopen(req, timeout=180) as r:
+                        total = int(r.headers.get("Content-Length", 0))
+                        done_bytes = 0
+                        with open(tmp, "wb") as f:
+                            while True:
+                                buf = r.read(65536)
+                                if not buf: break
+                                f.write(buf)
+                                done_bytes += len(buf)
+                    self._w(f"  Download fertig ({done_bytes//1024//1024} MB)", "ok")
+                    self._w("  Bitte hashcat-6.2.6.7z manuell entpacken nach: " + str(dest), "warn")
+                    tmp_dest = tools / "hashcat.7z"
+                    shutil.copy2(tmp, tmp_dest)
+                except Exception as e:
+                    self._w(f"  Download-Fehler: {e}", "err")
+
+            exe = next(dest.rglob("hashcat.exe"), None)
+            if exe:
+                cfg["tool_hashcat"] = str(exe)
+                self._w("  hashcat.exe gefunden", "ok")
+            step_done("hashcat")
+
+        # ── 6. Config schreiben ───────────────────────────────────────────────
+        cfg["workspace"] = str(base / "pentest")
         cfg["theme"]     = "catppuccin_mocha"
-        cfg_path = suite_dir / "suite_config.json"
-        cfg_path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
-        self._log(f"  ✓ {cfg_path}", "ok")
+        cfg_path = suite / "suite_config.json"
+        cfg_path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), "utf-8")
+        self._w(f"\n  Config: {cfg_path}", "ok")
+        self._w(f"  Tools konfiguriert: {len(cfg)-2}", "ok")
 
-        # 4. Desktop-Verknüpfung
-        step("Desktop-Verknüpfung")
-        try:
-            import winreg as _wr
-            desktop = Path(os.path.join(os.environ.get("USERPROFILE", ""),
-                                        "Desktop"))
-            suite_main = suite_dir / "openclaw_suite.py"
+        # ── 7. Desktop-Verknüpfung ────────────────────────────────────────────
+        if self._selected("Desktop-Verknüpfung"):
+            self._w("\n=== Desktop-Verknüpfung ===", "head")
+            desktop = Path(os.path.join(os.environ.get("USERPROFILE", ""), "Desktop"))
+            suite_main = suite / "openclaw_suite.py"
             pythonw    = Path(sys.executable).parent / "pythonw.exe"
             if not pythonw.exists():
                 pythonw = Path(sys.executable)
-
-            import comtypes.client
-            shell = comtypes.client.CreateObject("WScript.Shell")
-        except Exception:
+            ico = suite / "assets" / "g4meover.ico"
+            ico_arg = f'$s.IconLocation="{ico}";' if ico.exists() else ""
+            ps = (
+                f'$s=(New-Object -COM WScript.Shell).CreateShortcut("{desktop}\\G4MEOVER Suite.lnk");'
+                f'$s.TargetPath="{pythonw}";'
+                f'$s.Arguments=\\"{suite_main}\\";'
+                f'$s.WorkingDirectory="{suite}";'
+                f'$s.Description="G4MEOVER Security Suite v{VERSION}";'
+                f'{ico_arg}'
+                f'$s.Save()'
+            )
             try:
-                import subprocess as sp
-                desktop = Path(os.path.join(os.environ.get("USERPROFILE", ""), "Desktop"))
-                suite_main = suite_dir / "openclaw_suite.py"
+                subprocess.run(["powershell", "-Command", ps],
+                               capture_output=True, timeout=15)
+                self._w("  Desktop-Verknuepfung erstellt", "ok")
+            except Exception as e:
+                self._w(f"  Fehler: {e}", "err")
+            step_done("Desktop-Verknüpfung")
+
+        # ── 8. Startmenü ─────────────────────────────────────────────────────
+        if self._selected("Startmenü-Eintrag"):
+            self._w("\n=== Startmenue ===", "head")
+            try:
+                start = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+                g4_dir = start / "G4MEOVER"
+                g4_dir.mkdir(parents=True, exist_ok=True)
+                suite_main = suite / "openclaw_suite.py"
+                pythonw    = Path(sys.executable).parent / "pythonw.exe"
+                if not pythonw.exists():
+                    pythonw = Path(sys.executable)
                 ps = (
-                    f'$s=(New-Object -COM WScript.Shell).CreateShortcut("{desktop}\\G4MEOVER Suite.lnk");'
-                    f'$s.TargetPath="{sys.executable}";'
-                    f'$s.Arguments="{suite_main}";'
-                    f'$s.WorkingDirectory="{suite_dir}";'
-                    f'$s.Description="G4MEOVER Security Suite v{VERSION}";'
+                    f'$s=(New-Object -COM WScript.Shell).CreateShortcut("{g4_dir}\\G4MEOVER Suite.lnk");'
+                    f'$s.TargetPath="{pythonw}";'
+                    f'$s.Arguments=\\"{suite_main}\\";'
+                    f'$s.WorkingDirectory="{suite}";'
                     f'$s.Save()'
                 )
-                sp.run(["powershell", "-Command", ps], capture_output=True, timeout=15)
-                self._log(f"  ✓ Desktop-Verknüpfung erstellt", "ok")
+                subprocess.run(["powershell", "-Command", ps],
+                               capture_output=True, timeout=15)
+                self._w("  Startmenue-Eintrag erstellt", "ok")
             except Exception as e:
-                self._log(f"  [!] Shortcut: {e}", "err")
+                self._w(f"  Fehler: {e}", "err")
+            step_done("Startmenü-Eintrag")
 
-        self._log("\n══════════════════════════════════════════", "head")
-        self._log(f"Installation abgeschlossen!", "ok")
-        self._log(f"Suite-Pfad: {suite_dir}", "ok")
-        self._log(f"Tools-Pfad: {tools_dir}", "ok")
+        # ── Abschluss ─────────────────────────────────────────────────────────
+        self._prog(100, "Abgeschlossen")
+        self._installing = False
+        self._suite_path = str(suite / "openclaw_suite.py")
 
-        suite_main = suite_dir / "openclaw_suite.py"
-        self._suite_path = str(suite_main)
-        msg = (f"Suite installiert in:\n{suite_dir}\n\n"
-               f"Tools installiert in:\n{tools_dir}")
-        self.after(0, lambda: self._done_msg.configure(text=msg))
-        self.after(0, lambda: self._show_page(4))
+        msg = (f"G4MEOVER Suite:\n{suite}\n\n"
+               f"Tools:\n{tools}\n\n"
+               f"{len(cfg)-2} Tool(s) konfiguriert")
+        self.after(0, lambda: self._done_lbl.configure(text=msg))
+        self.after(0, lambda: self._show(4))
 
-    def _launch_suite(self):
+    def _launch(self):
         if hasattr(self, "_suite_path") and os.path.exists(self._suite_path):
-            subprocess.Popen([sys.executable, self._suite_path],
+            pythonw = Path(sys.executable).parent / "pythonw.exe"
+            exe = str(pythonw) if pythonw.exists() else sys.executable
+            subprocess.Popen([exe, self._suite_path],
                              cwd=os.path.dirname(self._suite_path))
         self.destroy()
 
 
-def main():
-    app = InstallerApp()
-    app.mainloop()
-
-
 if __name__ == "__main__":
-    main()
+    InstallerApp().mainloop()
