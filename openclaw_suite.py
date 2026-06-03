@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-G4MEOVER Security Suite  v1.4
+G4MEOVER Security Suite  v1.5
 All-in-One Pentesting GUI – Python/tkinter, Catppuccin Mocha
 Entwickelt von Yanis Ameseder
 """
@@ -20,7 +20,7 @@ sys.path.insert(0, str(_ROOT))
 # ─── Config laden ─────────────────────────────────────────────────────────────
 CONFIG_FILE = _ROOT / "suite_config.json"
 
-VERSION = "1.4"
+VERSION = "1.5"
 AUTHOR  = "Yanis Ameseder"
 GITHUB  = "https://github.com/G4MEOVER18/g4meover-security-suite"
 
@@ -59,6 +59,9 @@ from modules.settings         import SettingsModule
 from modules.help             import HelpModule
 from modules.pmkid            import PmkidModule
 from modules.handshake        import HandshakeModule
+from modules.live_capture     import LiveCaptureModule
+from modules.wordlist         import WordlistModule
+from modules.isolation        import IsolationModule
 
 
 # ─── Hauptfenster ─────────────────────────────────────────────────────────────
@@ -210,6 +213,9 @@ class G4MEOVERSuite(tk.Tk):
         self._web       = WebModule(self._nb, **common)
         self._osint     = OsintModule(self._nb, **common)
         self._exploit   = ExploitResearchModule(self._nb, **common)
+        self._live      = LiveCaptureModule(self._nb, **common)
+        self._wordlist  = WordlistModule(self._nb, **common)
+        self._isolation = IsolationModule(self._nb, **common)
         self._reporting = ReportingModule(self._nb, **common)
         self._settings  = SettingsModule(self._nb, **common)
         self._help      = HelpModule(self._nb, **common)
@@ -224,6 +230,9 @@ class G4MEOVERSuite(tk.Tk):
             (self._web,       "web",         "  Web-Testing  "),
             (self._osint,     "osint",       "  OSINT        "),
             (self._exploit,   "exploits",    "  Exploits     "),
+            (self._live,      "network",     "  Live Capture "),
+            (self._wordlist,  "passwords",   "  Wordlists    "),
+            (self._isolation, "wifi",        "  Isolation    "),
             (self._reporting, "reporting",   "  Reporting    "),
             (self._settings,  "settings",    "  Einstellungen"),
             (self._help,      "help",        "  Hilfe        "),

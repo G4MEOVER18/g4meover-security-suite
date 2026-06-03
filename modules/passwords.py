@@ -65,12 +65,14 @@ class PasswordModule(BaseModule):
         t3 = ttk.Frame(nb); nb.add(t3, text="  Hydra (Online)  ")
         t4 = ttk.Frame(nb); nb.add(t4, text="  Hash-Identify  ")
         t5 = ttk.Frame(nb); nb.add(t5, text="  Credential-Store  ")
+        t6 = ttk.Frame(nb); nb.add(t6, text="  VirusTotal  ")
 
         self._build_hashcat(t1)
         self._build_john(t2)
         self._build_hydra(t3)
         self._build_hashid(t4)
         self._build_credstore(t5)
+        self._build_virustotal(t6)
 
         self._credentials: list[dict] = []
 
@@ -576,3 +578,174 @@ class PasswordModule(BaseModule):
                 f.write(f"{c['ts']},{c['host']},{c['service']},"
                         f"{c['user']},{c['password']},{c['source']}\n")
         messagebox.showinfo("Export", f"Gespeichert: {path}")
+
+    # ── VirusTotal Hash-Lookup ─────────────────────────────────────────────────
+
+    def _build_virustotal(self, parent):
+        self._info_bar(parent,
+            "VirusTotal Hash-Lookup: MD5/SHA1/SHA256 über die öffentliche API prüfen. "
+            "API-Key in Einstellungen hinterlegen.")
+
+        paned = tk.PanedWindow(parent, orient="horizontal",
+                               bg=DARK["bg"], sashwidth=4, sashrelief="flat")
+        paned.pack(fill="both", expand=True, padx=4, pady=4)
+
+        left  = tk.Frame(paned, bg=DARK["bg"]); paned.add(left,  minsize=280, width=320)
+        right = tk.Frame(paned, bg=DARK["bg"]); paned.add(right, minsize=400)
+
+        # Hash-Eingabe
+        fh = self._section(left, "Hash")
+        self._vt_hash_var = tk.StringVar()
+        self._entry_row(fh, "Hash:", self._vt_hash_var)
+        tk.Label(fh, text="MD5 (32) / SHA1 (40) / SHA256 (64)",
+                 bg=DARK["bg"], fg=DARK["border"],
+                 font=("Segoe UI", 7, "italic")).pack(anchor="w", padx=10, pady=(0, 4))
+
+        # API-Key
+        fk = self._section(left, "API-Key")
+        self._vt_key_var = tk.StringVar(value=self.cfg.get("virustotal_api_key", ""))
+        vt_key_entry = tk.Entry(fk, textvariable=self._vt_key_var,
+                                bg=DARK["entry"], fg=DARK["fg"],
+                                insertbackground=DARK["accent"],
+                                relief="flat", font=("Consolas", 8), show="*")
+        vt_key_entry.pack(fill="x", padx=10, pady=4, ipady=3)
+        self._vt_show_var = tk.BooleanVar(value=False)
+        def _toggle_show():
+            vt_key_entry.configure(show="" if self._vt_show_var.get() else "*")
+        ttk.Checkbutton(fk, text="Key anzeigen", variable=self._vt_show_var,
+                        command=_toggle_show).pack(anchor="w", padx=10, pady=(0, 4))
+        tk.Label(fk, text="Kostenlos auf virustotal.com/gui/my-apikey",
+                 bg=DARK["bg"], fg=DARK["border"],
+                 font=("Segoe UI", 7, "italic")).pack(anchor="w", padx=10, pady=(0, 4))
+
+        # Lookup-Modus
+        fm = self._section(left, "Modus")
+        self._vt_mode_var = tk.StringVar(value="hash")
+        ttk.Radiobutton(fm, text="Hash-Lookup",
+                        variable=self._vt_mode_var, value="hash").pack(anchor="w", padx=10, pady=2)
+        ttk.Radiobutton(fm, text="URL-Lookup",
+                        variable=self._vt_mode_var, value="url").pack(anchor="w", padx=10, pady=2)
+        ttk.Radiobutton(fm, text="IP-Lookup",
+                        variable=self._vt_mode_var, value="ip").pack(anchor="w", padx=10, pady=(2, 6))
+
+        # Buttons
+        btn_f = tk.Frame(left, bg=DARK["bg"]); btn_f.pack(fill="x", padx=8, pady=8)
+        self._vt_btn = ttk.Button(btn_f, text="Lookup",
+                                   style="Accent.TButton",
+                                   command=self._run_vt_lookup)
+        self._vt_btn.pack(side="left", padx=(0, 4))
+        ttk.Button(btn_f, text="Leeren",
+                   command=lambda: self._vt_log.delete("1.0", "end")).pack(side="left")
+
+        # Ergebnis-Zusammenfassung
+        self._vt_summary_frame = tk.Frame(left, bg=DARK["panel"],
+                                           highlightthickness=1,
+                                           highlightbackground=DARK["border"])
+        self._vt_summary_frame.pack(fill="x", padx=8, pady=4)
+        self._vt_summary_labels: dict[str, tk.StringVar] = {}
+        for key in ("Erkennungen", "Gesamt-Scanner", "Scan-Datum", "Dateiname", "Dateigröße"):
+            row = tk.Frame(self._vt_summary_frame, bg=DARK["panel"])
+            row.pack(fill="x", padx=8, pady=1)
+            tk.Label(row, text=f"{key}:", bg=DARK["panel"], fg=DARK["border"],
+                     font=("Segoe UI", 8), width=15, anchor="w").pack(side="left")
+            var = tk.StringVar(value="—")
+            self._vt_summary_labels[key] = var
+            tk.Label(row, textvariable=var, bg=DARK["panel"], fg=DARK["fg"],
+                     font=("Consolas", 8), anchor="w").pack(side="left", fill="x", expand=True)
+
+        # Scan-Detektoren (Treeview)
+        det_frame = self._section_expand(right, "AV-Erkennungen")
+        det_cols  = ("engine", "result", "version", "updated")
+        self._vt_tree = ttk.Treeview(det_frame, columns=det_cols,
+                                      show="headings", height=12)
+        for col, w, txt in [("engine", 160, "Engine"), ("result", 200, "Ergebnis"),
+                             ("version", 100, "Version"), ("updated", 90, "Aktualisiert")]:
+            self._vt_tree.heading(col, text=txt)
+            self._vt_tree.column(col, width=w, anchor="w")
+        self._vt_tree.tag_configure("detected",   foreground=DARK["red"])
+        self._vt_tree.tag_configure("undetected", foreground=DARK["border"])
+        sb = ttk.Scrollbar(det_frame, command=self._vt_tree.yview)
+        self._vt_tree.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        self._vt_tree.pack(fill="both", expand=True, padx=4, pady=4)
+
+        self._vt_log = self._log_widget(right, height=6)
+
+    def _run_vt_lookup(self):
+        import threading as _t
+        query = self._vt_hash_var.get().strip()
+        if not query:
+            messagebox.showerror("Fehler", "Hash / URL / IP angeben."); return
+        key = self._vt_key_var.get().strip()
+        if not key:
+            messagebox.showerror("Fehler",
+                "Kein API-Key. Bitte in den Einstellungen unter 'virustotal_api_key' eintragen."); return
+        mode = self._vt_mode_var.get()
+        self._vt_btn.configure(state="disabled")
+        for item in self._vt_tree.get_children():
+            self._vt_tree.delete(item)
+        for sv in self._vt_summary_labels.values():
+            sv.set("—")
+        _t.Thread(target=self._vt_thread, args=(query, key, mode), daemon=True).start()
+
+    def _vt_thread(self, query: str, key: str, mode: str):
+        import urllib.request, urllib.error, json as _json
+        endpoints = {
+            "hash": f"https://www.virustotal.com/api/v3/files/{query}",
+            "url":  f"https://www.virustotal.com/api/v3/urls/{query}",
+            "ip":   f"https://www.virustotal.com/api/v3/ip_addresses/{query}",
+        }
+        url = endpoints.get(mode, endpoints["hash"])
+        try:
+            req = urllib.request.Request(url, headers={"x-apikey": key})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = _json.loads(resp.read().decode())
+            attrs = data.get("data", {}).get("attributes", {})
+
+            # Summary
+            stats   = attrs.get("last_analysis_stats", {})
+            malicious = stats.get("malicious", 0)
+            total     = sum(stats.values())
+            scan_date = attrs.get("last_analysis_date", "—")
+            if isinstance(scan_date, int):
+                from datetime import datetime as _dt
+                scan_date = _dt.utcfromtimestamp(scan_date).strftime("%Y-%m-%d")
+            names = attrs.get("names", [])
+            fname = names[0] if names else attrs.get("name", "—")
+            fsize = attrs.get("size", "—")
+            if isinstance(fsize, int):
+                fsize = f"{fsize:,} Bytes"
+
+            clr = DARK["red"] if malicious > 0 else DARK["green"]
+            self.after(0, self._vt_summary_labels["Erkennungen"].set,
+                       f"{malicious}/{total}")
+            self.after(0, self._vt_summary_labels["Gesamt-Scanner"].set, str(total))
+            self.after(0, self._vt_summary_labels["Scan-Datum"].set, scan_date)
+            self.after(0, self._vt_summary_labels["Dateiname"].set, fname)
+            self.after(0, self._vt_summary_labels["Dateigröße"].set, fsize)
+            self.after(0, self._log, self._vt_log,
+                       f"[{'!!! MALWARE' if malicious else '✓ Sauber'}] "
+                       f"{query[:60]}  →  {malicious}/{total} Erkennungen\n",
+                       "red" if malicious else "green")
+
+            # Detektionen
+            scans = attrs.get("last_analysis_results", {})
+            for engine, res in sorted(scans.items()):
+                result  = res.get("result") or "—"
+                version = res.get("engine_version") or "—"
+                updated = res.get("engine_update") or "—"
+                detected = bool(res.get("result"))
+                tag = "detected" if detected else "undetected"
+                self.after(0, self._vt_tree.insert, "", "end",
+                           values=(engine, result, version, updated), tags=(tag,))
+
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                self.after(0, self._log, self._vt_log,
+                           "[✓] Hash nicht in VirusTotal-Datenbank (unbekannte Datei).\n", "yellow")
+            else:
+                self.after(0, self._log, self._vt_log, f"[!] HTTP {e.code}: {e}\n", "red")
+        except Exception as e:
+            self.after(0, self._log, self._vt_log, f"[!] {e}\n", "red")
+        finally:
+            self.after(0, self._vt_btn.configure, {"state": "normal"})
