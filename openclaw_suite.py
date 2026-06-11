@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-G4MEOVER Security Suite  v1.5
-All-in-One Pentesting GUI – Python/tkinter, Catppuccin Mocha
+G4MEOVER Security Suite  v2.3
+All-in-One Security Suite (offensiv + defensiv) – Python/tkinter, Catppuccin Mocha
 Entwickelt von Yanis Ameseder
 """
 
@@ -20,7 +20,7 @@ sys.path.insert(0, str(_ROOT))
 # ─── Config laden ─────────────────────────────────────────────────────────────
 CONFIG_FILE = _ROOT / "suite_config.json"
 
-VERSION = "1.5"
+VERSION = "2.3"
 AUTHOR  = "Yanis Ameseder"
 GITHUB  = "https://github.com/G4MEOVER18/g4meover-security-suite"
 
@@ -62,6 +62,16 @@ from modules.handshake        import HandshakeModule
 from modules.live_capture     import LiveCaptureModule
 from modules.wordlist         import WordlistModule
 from modules.isolation        import IsolationModule
+from modules.hardening_audit   import HardeningAuditModule
+from modules.port_exposure     import PortExposureModule
+from modules.integrity_monitor import IntegrityMonitorModule
+from modules.privesc_audit     import PrivescAuditModule
+from modules.av_test           import AvTestModule
+from modules.vuln_scan         import VulnScanModule
+from modules.secrets_audit     import SecretsAuditModule
+from modules.account_audit     import AccountAuditModule
+from modules.firewall_audit    import FirewallAuditModule
+from modules.log_watcher       import LogWatcherModule
 
 
 # ─── Hauptfenster ─────────────────────────────────────────────────────────────
@@ -216,9 +226,25 @@ class G4MEOVERSuite(tk.Tk):
         self._live      = LiveCaptureModule(self._nb, **common)
         self._wordlist  = WordlistModule(self._nb, **common)
         self._isolation = IsolationModule(self._nb, **common)
+        self._hardening = HardeningAuditModule(self._nb, **common)
+        self._exposure  = PortExposureModule(self._nb, **common)
+        self._integrity = IntegrityMonitorModule(self._nb, **common)
+        self._privesc   = PrivescAuditModule(self._nb, **common)
+        self._avtest    = AvTestModule(self._nb, **common)
+        self._vuln      = VulnScanModule(self._nb, **common)
+        self._secrets   = SecretsAuditModule(self._nb, **common)
+        self._account   = AccountAuditModule(self._nb, **common)
+        self._firewall  = FirewallAuditModule(self._nb, **common)
+        self._logs      = LogWatcherModule(self._nb, **common)
         self._reporting = ReportingModule(self._nb, **common)
         self._settings  = SettingsModule(self._nb, **common)
         self._help      = HelpModule(self._nb, **common)
+
+        # Audit-Module mit dem Reporting verdrahten → Befunde als Findings
+        for _m in (self._hardening, self._exposure, self._integrity,
+                   self._privesc, self._avtest, self._vuln,
+                   self._secrets, self._account, self._firewall):
+            _m._report_cb = self._reporting.add_finding
 
         tab_defs = [
             (self._dashboard, "dashboard",   "  Dashboard    "),
@@ -233,6 +259,16 @@ class G4MEOVERSuite(tk.Tk):
             (self._live,      "network",     "  Live Capture "),
             (self._wordlist,  "passwords",   "  Wordlists    "),
             (self._isolation, "wifi",        "  Isolation    "),
+            (self._hardening, "settings",    "  Hardening    "),
+            (self._exposure,  "network",     "  Exposure     "),
+            (self._integrity, "reporting",   "  Integrität   "),
+            (self._privesc,   "exploits",    "  Privesc      "),
+            (self._avtest,    "wifi",        "  AV / EDR     "),
+            (self._vuln,      "exploits",    "  Vuln-Scan    "),
+            (self._secrets,   "passwords",   "  Secrets      "),
+            (self._account,   "settings",    "  Konten       "),
+            (self._firewall,  "network",     "  Firewall     "),
+            (self._logs,      "osint",       "  Event-Logs   "),
             (self._reporting, "reporting",   "  Reporting    "),
             (self._settings,  "settings",    "  Einstellungen"),
             (self._help,      "help",        "  Hilfe        "),
@@ -343,7 +379,7 @@ class G4MEOVERSuite(tk.Tk):
         tk.Label(badge_f, text=f" v{VERSION} ",
                  bg=DARK["accent"], fg=DARK["bg"],
                  font=("Segoe UI", 9, "bold")).pack(side="left", padx=4)
-        tk.Label(badge_f, text="All-in-One Pentesting GUI",
+        tk.Label(badge_f, text="All-in-One Security Suite · offensiv + defensiv",
                  bg=DARK["panel"], fg=DARK["border"],
                  font=("Segoe UI", 8, "italic")).pack(side="left")
 

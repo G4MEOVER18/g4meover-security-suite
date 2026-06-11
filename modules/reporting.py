@@ -241,6 +241,31 @@ class ReportingModule(BaseModule):
     def add_timeline_event(self, module: str, action: str, status: str = "ok"):
         self.after(0, self._add_timeline_entry, module, action, status)
 
+    # ── Programmatischer Finding-Import (thread-safe) ───────────────────────────
+
+    def add_finding(self, title: str, severity: str, description: str = "",
+                    evidence: str = ""):
+        """Fügt ein Finding aus einem anderen Modul hinzu (thread-safe).
+
+        Wird von den Audit-Modulen genutzt, um Befunde direkt in den Report
+        zu übernehmen. severity wird auf die bekannten Stufen normalisiert.
+        """
+        if severity not in SEVERITY_LEVELS:
+            severity = "Info"
+        self.after(0, self._insert_finding, title, severity, description, evidence)
+
+    def _insert_finding(self, title, severity, description, evidence):
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+        # Duplikate (gleicher Titel + Severity) überspringen
+        for f in self._findings:
+            if f["title"] == title and f["severity"] == severity:
+                return
+        self._findings.append({"title": title, "severity": severity,
+                               "description": description, "evidence": evidence,
+                               "timestamp": ts})
+        self._find_tree.insert("", "end", values=(severity, title, evidence or "—"),
+                               tags=(severity,))
+
     # ═══════════════════════════════════════════════════════════════════════════
     # Tab 3 – Report-Generator
     # ═══════════════════════════════════════════════════════════════════════════

@@ -5,6 +5,7 @@ import subprocess
 import threading
 import os
 import re
+import json
 from datetime import datetime
 from pathlib import Path
 from utils.theme import DARK
@@ -57,6 +58,7 @@ class BaseModule(ttk.Frame):
         self._activity_cb = activity_cb     # → Dashboard-Activity-Log
         self._tools = tools or {}           # tool_name → path
         self._running_proc: subprocess.Popen | None = None
+        self._report_cb = None              # → ReportingModule.add_finding (lazy gesetzt)
         self._build()
 
     # ── Überschreiben in Unterklassen ─────────────────────────────────────────
@@ -236,3 +238,45 @@ class BaseModule(ttk.Frame):
                       f"[!] {name} nicht gefunden. Bitte in Einstellungen konfigurieren.\n",
                       "red")
         return path or None
+
+    # ── PowerShell-Helper (read-only Audits) ────────────────────────────────────
+
+    def _ps_json(self, ps_script: str, timeout: int = 120) -> tuple[list, str]:
+        """Führt ein PowerShell-Skript aus und parst dessen JSON-Ausgabe.
+
+        Erzwingt UTF-8 (PS-Ausgabe + Python-Dekodierung), damit Umlaute und
+        beliebige Event-Log-Inhalte nicht den cp1252-Decoder sprengen.
+        Rückgabe: (data, error). error == '' bei Erfolg; data ist immer eine Liste.
+        """
+        full = ("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n"
+                + ps_script)
+        try:
+            proc = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive",
+                 "-ExecutionPolicy", "Bypass", "-Command", full],
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace",
+                creationflags=subprocess.CREATE_NO_WINDOW, timeout=timeout)
+        except Exception as e:
+            return [], str(e)
+        out = (proc.stdout or "").strip()
+        if not out:
+            return [], (proc.stderr or "").strip()
+        try:
+            data = json.loads(out)
+        except Exception as e:
+            return [], f"JSON-Fehler: {e}"
+        if isinstance(data, dict):
+            data = [data]
+        return data, ""
+
+    def _report_finding(self, title: str, severity: str,
+                        description: str = "", evidence: str = "") -> bool:
+        """Schickt ein Finding ans Reporting-Modul, falls verdrahtet.
+
+        Rückgabe: True wenn übergeben, False wenn kein Reporting verbunden.
+        """
+        if self._report_cb:
+            self._report_cb(title, severity, description, evidence)
+            return True
+        return False

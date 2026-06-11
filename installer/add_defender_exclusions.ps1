@@ -72,7 +72,8 @@ $ExcludePaths = @(
 
     # Wordlisten und Workspace
     "C:\wordlists",
-    "C:\Users\Yanis\pentest",
+    "$env:USERPROFILE\pentest",
+    "$env:USERPROFILE\security-suite"
 )
 
 # ── Prozesse ausschließen ─────────────────────────────────────────────────────
@@ -88,6 +89,8 @@ $ExcludeProcesses = @(
     "ruby.exe",        # nikto / whatweb
     "perl.exe",        # nikto
     "msfconsole.bat",
+    "python.exe",      # Suite + sqlmap
+    "pythonw.exe"
 )
 
 # ── Dateierweiterungen ausschließen ──────────────────────────────────────────

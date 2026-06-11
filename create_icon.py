@@ -2,7 +2,7 @@
 from PIL import Image, ImageDraw, ImageFont
 import math, os
 
-OUT = r"C:\Data\KI\apps\openclaw\workspace-claudebot\pentest-suite\assets\g4meover.ico"
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "g4meover.ico")
 
 # Catppuccin Mocha
 BG      = (30,  30,  46)   # base
