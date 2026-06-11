@@ -87,7 +87,10 @@ try {
     $hist = "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
     if (Test-Path $hist) {
         $hits = Select-String -Path $hist -Pattern 'password|passwort|secret|token|apikey|api_key|-p\s|ConvertTo-SecureString|AccessKey' -AllMatches
-        if ($hits) { Add-Sec 'PowerShell-History' 'Hoch' $hist "$(@($hits).Count) Zeile(n) mit moeglichen Secrets." 'History bereinigen; keine Klartext-Secrets in der Shell eingeben.' }
+        if ($hits) {
+            $lines = (($hits | ForEach-Object { $_.Line.Trim() } | Select-Object -First 12) -join '  |  ')
+            Add-Sec 'PowerShell-History' 'Hoch' $hist "$(@($hits).Count) Treffer: $lines" 'History bereinigen; keine Klartext-Secrets in der Shell eingeben.'
+        }
         else { Add-Sec 'PowerShell-History' 'OK' 'PSReadLine' 'Keine verdaechtigen Muster in der History.' '' }
     }
 } catch {}
@@ -97,7 +100,8 @@ try {
     $gc = "$env:USERPROFILE\.git-credentials"
     if (Test-Path $gc) {
         $lines = @(Get-Content $gc)
-        Add-Sec 'git-credentials' 'Hoch' $gc "$($lines.Count) Klartext-Repo-Zugang/Zugaenge." 'Auf Git Credential Manager umstellen; Datei entfernen.'
+        $joined = (($lines | Select-Object -First 10) -join '  |  ')
+        Add-Sec 'git-credentials' 'Hoch' $gc "$($lines.Count) Zugang/Zugaenge (Klartext): $joined" 'Auf Git Credential Manager umstellen; Datei entfernen.'
     } else { Add-Sec 'git-credentials' 'OK' '.git-credentials' 'Keine .git-credentials-Datei.' '' }
 } catch {}
 

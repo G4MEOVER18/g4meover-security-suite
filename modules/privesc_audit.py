@@ -17,6 +17,8 @@ führt der Nutzer selbst durch.
 import tkinter as tk
 from tkinter import ttk
 import threading
+import os
+import re
 from datetime import datetime
 
 from modules.base import BaseModule
@@ -164,6 +166,9 @@ class PrivescAuditModule(BaseModule):
         self._run_btn = ttk.Button(bar, text="Privesc-Audit starten",
                                     style="Accent.TButton", command=self._start)
         self._run_btn.pack(side="left")
+        self._verify_btn = ttk.Button(bar, text="Beschreibbarkeit verifizieren",
+                                       command=self._start_verify, state="disabled")
+        self._verify_btn.pack(side="left", padx=(6, 0))
         self._report_btn = ttk.Button(bar, text="Befunde an Reporting",
                                        command=self._send_to_report, state="disabled")
         self._report_btn.pack(side="left", padx=(6, 0))
@@ -213,24 +218,25 @@ class PrivescAuditModule(BaseModule):
         self._tree.insert("", "end", tags=("Kritisch",),
                           values=("Fehler", "—", msg, "Als Administrator starten?"))
 
+    _ORDER = {"Kritisch": 0, "Hoch": 1, "Mittel": 2, "Niedrig": 3, "Info": 4, "OK": 5}
+
     def _render(self, data: list[dict]):
         self._findings = data
-        order = {"Kritisch": 0, "Hoch": 1, "Mittel": 2, "Niedrig": 3, "Info": 4, "OK": 5}
         weight = {"Kritisch": 5, "Hoch": 3, "Mittel": 2, "Niedrig": 1}
         risk = problems = ok = 0
-        for d in sorted(data, key=lambda d: order.get(d.get("severity", "Info"), 9)):
+        for d in data:
             sev = d.get("severity", "Info")
-            self._tree.insert("", "end", tags=(sev,), values=(
-                d.get("name", ""), d.get("status", ""),
-                d.get("detail", ""), d.get("recommendation", "")))
             if sev == "OK":
                 ok += 1
             elif sev in weight:
                 problems += 1
                 risk += weight[sev]
+        self._render_tree()
         self._run_btn.configure(state="normal")
         if self._findings:
             self._report_btn.configure(state="normal")
+        if any(self._verify_path(d) for d in self._findings):
+            self._verify_btn.configure(state="normal")
         if problems == 0:
             self._score_var.set(f"✓ {ok} Checks ok — keine Privesc-Vektoren")
             self._score_lbl.configure(fg=DARK["green"])
@@ -240,6 +246,71 @@ class PrivescAuditModule(BaseModule):
             self._score_lbl.configure(fg=clr)
         if self._activity_cb:
             self._activity_cb(f"Privesc-Audit fertig: {problems} Vektor(en), Risiko {risk}")
+
+    def _render_tree(self):
+        for iid in self._tree.get_children():
+            self._tree.delete(iid)
+        for d in sorted(self._findings, key=lambda d: self._ORDER.get(d.get("severity", "Info"), 9)):
+            status = d.get("status", "")
+            v = d.get("verified")
+            if v is True:
+                status = "✓ AUSNUTZBAR · " + status
+            elif v is False:
+                status = "nicht beschreibbar · " + status
+            self._tree.insert("", "end", tags=(d.get("severity", "Info"),), values=(
+                d.get("name", ""), status, d.get("detail", ""), d.get("recommendation", "")))
+
+    # ── Aktive Verifikation (Schreibtest, reversibel) ───────────────────────────
+
+    @staticmethod
+    def _verify_path(finding: dict) -> str | None:
+        """Extrahiert ein zu testendes Verzeichnis aus verifizierbaren Befunden."""
+        name = finding.get("name", "")
+        detail = finding.get("detail", "")
+        if name == "Beschreibbares PATH-Dir":
+            return detail.strip() if os.path.isdir(detail.strip()) else None
+        if name == "Beschreibbarer Dienst":
+            m = re.search(r'->\s*(.+?\.exe)', detail)
+            if m:
+                d = os.path.dirname(m.group(1))
+                return d if os.path.isdir(d) else None
+        return None
+
+    def _start_verify(self):
+        self._verify_btn.configure(state="disabled")
+        self._score_var.set("Verifiziere Schreibrechte …")
+        threading.Thread(target=self._verify, daemon=True).start()
+
+    def _verify(self):
+        confirmed = 0
+        for d in self._findings:
+            path = self._verify_path(d)
+            if not path:
+                continue
+            d["verified"] = self._writable(path)
+            if d["verified"]:
+                confirmed += 1
+        self.after(0, self._verify_done, confirmed)
+
+    @staticmethod
+    def _writable(path: str) -> bool:
+        """Echter Schreibtest: temporäre Datei anlegen und sofort entfernen."""
+        test = os.path.join(path, f".g4m_write_test_{os.getpid()}.tmp")
+        try:
+            with open(test, "w") as f:
+                f.write("test")
+            os.remove(test)
+            return True
+        except Exception:
+            return False
+
+    def _verify_done(self, confirmed: int):
+        self._render_tree()
+        self._verify_btn.configure(state="normal")
+        self._score_var.set(f"Verifikation: {confirmed} Pfad(e) wirklich beschreibbar (ausnutzbar)")
+        self._score_lbl.configure(fg=DARK["red"] if confirmed else DARK["green"])
+        if self._activity_cb:
+            self._activity_cb(f"Privesc-Verifikation: {confirmed} Vektor(en) bestätigt ausnutzbar")
 
     def _send_to_report(self):
         sent = 0

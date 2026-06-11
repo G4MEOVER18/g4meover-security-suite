@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-G4MEOVER Security Suite – Installer v2.3
+G4MEOVER Security Suite – Installer v2.4
 Alle Tools sind direkt im Installer eingebettet (offline-fähig).
 Nur nmap, Wireshark und hashcat werden per winget/Download nachgeladen.
 """
@@ -17,7 +17,7 @@ import time
 import winreg
 from pathlib import Path
 
-VERSION    = "2.3"
+VERSION    = "2.4"
 SUITE_NAME = "G4MEOVER Security Suite"
 AUTHOR     = "Yanis Ameseder"
 GITHUB     = "https://github.com/G4MEOVER18/g4meover-security-suite"

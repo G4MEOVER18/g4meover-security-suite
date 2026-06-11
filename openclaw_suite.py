@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-G4MEOVER Security Suite  v2.3
+G4MEOVER Security Suite  v2.4
 All-in-One Security Suite (offensiv + defensiv) – Python/tkinter, Catppuccin Mocha
 Entwickelt von Yanis Ameseder
 """
@@ -20,7 +20,7 @@ sys.path.insert(0, str(_ROOT))
 # ─── Config laden ─────────────────────────────────────────────────────────────
 CONFIG_FILE = _ROOT / "suite_config.json"
 
-VERSION = "2.3"
+VERSION = "2.4"
 AUTHOR  = "Yanis Ameseder"
 GITHUB  = "https://github.com/G4MEOVER18/g4meover-security-suite"
 
@@ -71,6 +71,8 @@ from modules.vuln_scan         import VulnScanModule
 from modules.secrets_audit     import SecretsAuditModule
 from modules.account_audit     import AccountAuditModule
 from modules.firewall_audit    import FirewallAuditModule
+from modules.attack_sim        import AttackSimModule
+from modules.local_hashes      import LocalHashesModule
 from modules.log_watcher       import LogWatcherModule
 
 
@@ -203,84 +205,128 @@ class G4MEOVERSuite(tk.Tk):
                  font=("Segoe UI", 7)).pack(side="right", padx=4)
 
     def _build_notebook(self):
-        # Notebook
+        # Äußeres Notebook (Kategorien)
         self._nb = ttk.Notebook(self)
         self._nb.pack(fill="both", expand=True)
 
         common = dict(cfg=self._cfg, target_var=self._target_var,
                       activity_cb=self._activity_cb, tools=self._tools)
+        self._module_location = {}   # module → (group_frame, inner_nb)
 
-        self._dashboard = DashboardModule(
-            self._nb, cfg=self._cfg, target_var=self._target_var,
-            activity_cb=self._activity_cb, tools=self._tools,
-            notebook_select_cb=self._nb.select)
-
-        self._network   = NetworkModule(self._nb, **common)
-        self._wifi      = WifiWpaModule(self._nb, **common)
-        self._handshake = HandshakeModule(self._nb, **common)
-        self._pmkid     = PmkidModule(self._nb, **common)
-        self._passwords = PasswordModule(self._nb, **common)
-        self._web       = WebModule(self._nb, **common)
-        self._osint     = OsintModule(self._nb, **common)
-        self._exploit   = ExploitResearchModule(self._nb, **common)
-        self._live      = LiveCaptureModule(self._nb, **common)
-        self._wordlist  = WordlistModule(self._nb, **common)
-        self._isolation = IsolationModule(self._nb, **common)
-        self._hardening = HardeningAuditModule(self._nb, **common)
-        self._exposure  = PortExposureModule(self._nb, **common)
-        self._integrity = IntegrityMonitorModule(self._nb, **common)
-        self._privesc   = PrivescAuditModule(self._nb, **common)
-        self._avtest    = AvTestModule(self._nb, **common)
-        self._vuln      = VulnScanModule(self._nb, **common)
-        self._secrets   = SecretsAuditModule(self._nb, **common)
-        self._account   = AccountAuditModule(self._nb, **common)
-        self._firewall  = FirewallAuditModule(self._nb, **common)
-        self._logs      = LogWatcherModule(self._nb, **common)
-        self._reporting = ReportingModule(self._nb, **common)
-        self._settings  = SettingsModule(self._nb, **common)
-        self._help      = HelpModule(self._nb, **common)
-
-        # Audit-Module mit dem Reporting verdrahten → Befunde als Findings
-        for _m in (self._hardening, self._exposure, self._integrity,
-                   self._privesc, self._avtest, self._vuln,
-                   self._secrets, self._account, self._firewall):
-            _m._report_cb = self._reporting.add_finding
-
-        tab_defs = [
-            (self._dashboard, "dashboard",   "  Dashboard    "),
-            (self._network,   "network",     "  Netzwerk     "),
-            (self._wifi,      "wifi",        "  WiFi / WPA   "),
-            (self._handshake, "handshake",   "  Handshake    "),
-            (self._pmkid,     "pmkid",       "  PMKID        "),
-            (self._passwords, "passwords",   "  Passwörter   "),
-            (self._web,       "web",         "  Web-Testing  "),
-            (self._osint,     "osint",       "  OSINT        "),
-            (self._exploit,   "exploits",    "  Exploits     "),
-            (self._live,      "network",     "  Live Capture "),
-            (self._wordlist,  "passwords",   "  Wordlists    "),
-            (self._isolation, "wifi",        "  Isolation    "),
-            (self._hardening, "settings",    "  Hardening    "),
-            (self._exposure,  "network",     "  Exposure     "),
-            (self._integrity, "reporting",   "  Integrität   "),
-            (self._privesc,   "exploits",    "  Privesc      "),
-            (self._avtest,    "wifi",        "  AV / EDR     "),
-            (self._vuln,      "exploits",    "  Vuln-Scan    "),
-            (self._secrets,   "passwords",   "  Secrets      "),
-            (self._account,   "settings",    "  Konten       "),
-            (self._firewall,  "network",     "  Firewall     "),
-            (self._logs,      "osint",       "  Event-Logs   "),
-            (self._reporting, "reporting",   "  Reporting    "),
-            (self._settings,  "settings",    "  Einstellungen"),
-            (self._help,      "help",        "  Hilfe        "),
-        ]
-        for module, icon_key, label in tab_defs:
+        def _add_top(module, icon_key, label):
             ico = get_icon(icon_key)
             if ico:
                 self._nb.add(module, text=label, image=ico, compound="left")
             else:
                 self._nb.add(module, text=label)
 
+        def _make_group(icon_key, label):
+            frame = ttk.Frame(self._nb)
+            inner = ttk.Notebook(frame)
+            inner.pack(fill="both", expand=True)
+            ico = get_icon(icon_key)
+            if ico:
+                self._nb.add(frame, text=label, image=ico, compound="left")
+            else:
+                self._nb.add(frame, text=label)
+            return frame, inner
+
+        def _add_sub(group, cls, icon_key, label):
+            module = cls(group[1], **common)
+            ico = get_icon(icon_key)
+            if ico:
+                group[1].add(module, text=label, image=ico, compound="left")
+            else:
+                group[1].add(module, text=label)
+            self._module_location[module] = group
+            return module
+
+        # ── Dashboard (Top-Level) ───────────────────────────────────────────────
+        self._dashboard = DashboardModule(
+            self._nb, cfg=self._cfg, target_var=self._target_var,
+            activity_cb=self._activity_cb, tools=self._tools,
+            notebook_select_cb=self._navigate)
+        _add_top(self._dashboard, "dashboard", "  Dashboard ")
+
+        # ── Recon ────────────────────────────────────────────────────────────────
+        g = _make_group("network", "  Recon ")
+        self._network = _add_sub(g, NetworkModule,          "network",  "  Netzwerk     ")
+        self._osint   = _add_sub(g, OsintModule,            "osint",    "  OSINT        ")
+        self._web     = _add_sub(g, WebModule,              "web",      "  Web-Testing  ")
+        self._exploit = _add_sub(g, ExploitResearchModule,  "exploits", "  Exploits     ")
+        self._live    = _add_sub(g, LiveCaptureModule,      "network",  "  Live Capture ")
+
+        # ── WLAN ───────────────────────────────────────────────────────────────
+        g = _make_group("wifi", "  WLAN ")
+        self._wifi      = _add_sub(g, WifiWpaModule,    "wifi",      "  WiFi / WPA  ")
+        self._handshake = _add_sub(g, HandshakeModule,  "handshake", "  Handshake   ")
+        self._pmkid     = _add_sub(g, PmkidModule,      "pmkid",     "  PMKID       ")
+        self._isolation = _add_sub(g, IsolationModule,  "wifi",      "  Isolation   ")
+
+        # ── Passwörter & Secrets ────────────────────────────────────────────────
+        g = _make_group("passwords", "  Passwörter ")
+        self._passwords = _add_sub(g, PasswordModule,      "passwords", "  Passwörter ")
+        self._wordlist  = _add_sub(g, WordlistModule,      "passwords", "  Wordlists  ")
+        self._secrets   = _add_sub(g, SecretsAuditModule,  "passwords", "  Secrets    ")
+
+        # ── Härtung (Defensive Audits) ──────────────────────────────────────────
+        g = _make_group("settings", "  Härtung ")
+        self._hardening = _add_sub(g, HardeningAuditModule, "settings",  "  Hardening ")
+        self._account   = _add_sub(g, AccountAuditModule,   "settings",  "  Konten    ")
+        self._firewall  = _add_sub(g, FirewallAuditModule,  "network",   "  Firewall  ")
+        self._avtest    = _add_sub(g, AvTestModule,         "wifi",      "  AV / EDR  ")
+
+        # ── Angriffstests ────────────────────────────────────────────────────────
+        g = _make_group("exploits", "  Angriffstests ")
+        self._privesc   = _add_sub(g, PrivescAuditModule, "exploits",  "  Privesc       ")
+        self._exposure  = _add_sub(g, PortExposureModule, "network",   "  Exposure      ")
+        self._vuln      = _add_sub(g, VulnScanModule,     "exploits",  "  Vuln-Scan     ")
+        self._attacksim = _add_sub(g, AttackSimModule,    "exploits",  "  EDR-Tests     ")
+        self._localhash = _add_sub(g, LocalHashesModule,  "passwords", "  Passwort-Audit ")
+
+        # ── Forensik / Monitoring ────────────────────────────────────────────────
+        g = _make_group("osint", "  Forensik ")
+        self._integrity = _add_sub(g, IntegrityMonitorModule, "reporting", "  Integrität  ")
+        self._logs      = _add_sub(g, LogWatcherModule,       "osint",     "  Event-Logs  ")
+
+        # ── Top-Level: Reporting / Einstellungen / Hilfe ─────────────────────────
+        self._reporting = ReportingModule(self._nb, **common)
+        _add_top(self._reporting, "reporting", "  Reporting ")
+        self._settings = SettingsModule(self._nb, **common)
+        _add_top(self._settings, "settings", "  Einstellungen ")
+        self._help = HelpModule(self._nb, **common)
+        _add_top(self._help, "help", "  Hilfe ")
+
+        # Audit-Module mit dem Reporting verdrahten → Befunde als Findings
+        for _m in (self._hardening, self._exposure, self._integrity,
+                   self._privesc, self._avtest, self._vuln,
+                   self._secrets, self._account, self._firewall,
+                   self._attacksim, self._localhash):
+            _m._report_cb = self._reporting.add_finding
+
         self._nb.bind("<<NotebookTabChanged>>", self._on_tab_change)
+
+    def _navigate(self, key):
+        """Springt zu einem Modul – auch in verschachtelten Kategorie-Notebooks.
+
+        key: String-Alias (vom Dashboard) oder direkt ein Modul-Widget.
+        """
+        aliases = {
+            "network": getattr(self, "_network", None),
+            "wifi":    getattr(self, "_wifi", None),
+            "web":     getattr(self, "_web", None),
+            "osint":   getattr(self, "_osint", None),
+        }
+        module = aliases.get(key) if isinstance(key, str) else key
+        if module is None:
+            return
+        loc = self._module_location.get(module)
+        if loc:
+            frame, inner = loc
+            self._nb.select(frame)
+            inner.select(module)
+        else:
+            self._nb.select(module)
 
     def _build_statusbar(self):
         tk.Frame(self, bg=DARK["border"], height=1).pack(fill="x", side="bottom")

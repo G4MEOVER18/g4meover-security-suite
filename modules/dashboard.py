@@ -150,20 +150,20 @@ class DashboardModule(BaseModule):
 
     def _qs_discovery(self):
         if self._notebook_select:
-            self._notebook_select(1)
+            self._notebook_select("network")
 
     def _qs_portscan(self):
         if self._notebook_select:
-            self._notebook_select(1)
+            self._notebook_select("network")
 
     def _qs_web(self):
         if self._notebook_select:
-            self._notebook_select(4)
+            self._notebook_select("web")
 
     def _qs_wpa(self):
         if self._notebook_select:
-            self._notebook_select(2)
+            self._notebook_select("wifi")
 
     def _qs_osint(self):
         if self._notebook_select:
-            self._notebook_select(5)
+            self._notebook_select("osint")

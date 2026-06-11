@@ -105,16 +105,59 @@ $r | ConvertTo-Json -Depth 3 -Compress
 '''
 
 
+# Im Klartext abrufbare Zugangsdaten des AKTUELLEN Benutzers (kein Admin nötig):
+# Windows Credential Vault (Web-Credentials) + gespeicherte WLAN-Schlüssel.
+_PASSWORDS_PS = r'''
+$ErrorActionPreference = 'SilentlyContinue'
+$out = New-Object System.Collections.ArrayList
+
+# Windows Credential Vault (Web-/App-Credentials – Klartext fuer den aktuellen User)
+try {
+    [void][Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime]
+    $vault = New-Object Windows.Security.Credentials.PasswordVault
+    foreach ($c in $vault.RetrieveAll()) {
+        try { $c.RetrievePassword() } catch {}
+        [void]$out.Add([PSCustomObject]@{ source='Credential Vault'; resource="$($c.Resource)"; user="$($c.UserName)"; password="$($c.Password)" })
+    }
+} catch {}
+
+# Gespeicherte WLAN-Schluessel (Klartext)
+try {
+    $profOut = netsh wlan show profiles 2>$null
+    $names = $profOut | Select-String -Pattern ':\s*(.+)$' | ForEach-Object { ($_ -split ':',2)[1].Trim() } |
+             Where-Object { $_ -and $_ -notmatch 'BSSID|GUID' } | Select-Object -Unique
+    foreach ($n in $names) {
+        $det = netsh wlan show profile name="$n" key=clear 2>$null
+        $kl = $det | Select-String -Pattern 'Key Content|Schl.sselinhalt' | Select-Object -First 1
+        if ($kl) {
+            $k = ($kl -split ':',2)[1].Trim()
+            if ($k) { [void]$out.Add([PSCustomObject]@{ source='WLAN'; resource="$n"; user=''; password="$k" }) }
+        }
+    }
+} catch {}
+
+$out | ConvertTo-Json -Depth 3 -Compress
+'''
+
+
 class AccountAuditModule(BaseModule):
     """Read-only Konten-, Policy- & Credential-Schutz-Audit."""
 
     def _build(self):
         self._info_bar(
             self,
-            "Read-only Audit von Konten, Passwort-Policy und Credential-/LSASS-Schutz "
-            "(RunAsPPL, WDigest, NTLM-Level, Credential Guard). Vollständig als Administrator.")
+            "Read-only Audit von Konten, Passwort-Policy und Credential-/LSASS-Schutz. "
+            "Tab 'Abrufbare Passwörter' zeigt für deinen eigenen Benutzer im Klartext lesbare Zugangsdaten.")
+        nb = ttk.Notebook(self)
+        nb.pack(fill="both", expand=True, padx=6, pady=6)
+        t1 = ttk.Frame(nb); t2 = ttk.Frame(nb)
+        nb.add(t1, text="  Konten & Schutz  ")
+        nb.add(t2, text="  Abrufbare Passwörter  ")
+        self._build_checks(t1)
+        self._build_passwords(t2)
 
-        bar = tk.Frame(self, bg=DARK["bg"]); bar.pack(fill="x", padx=10, pady=(6, 2))
+    def _build_checks(self, parent):
+        bar = tk.Frame(parent, bg=DARK["bg"]); bar.pack(fill="x", padx=10, pady=(6, 2))
         self._run_btn = ttk.Button(bar, text="Konten-Audit starten",
                                     style="Accent.TButton", command=self._start)
         self._run_btn.pack(side="left")
@@ -126,7 +169,7 @@ class AccountAuditModule(BaseModule):
                                  fg=DARK["border"], font=("Segoe UI", 10, "bold"))
         self._sum_lbl.pack(side="right", padx=8)
 
-        sec = self._section_expand(self, "Konten & Credential-Schutz")
+        sec = self._section_expand(parent, "Konten & Credential-Schutz")
         cols = ("check", "status", "detail", "rec")
         self._tree = ttk.Treeview(sec, columns=cols, show="headings", selectmode="browse")
         for c, t, w in [("check", "Prüfung", 220), ("status", "Status", 150),
@@ -203,3 +246,88 @@ class AccountAuditModule(BaseModule):
         if self._activity_cb:
             self._activity_cb(f"{sent} Konten-Befund(e) an Reporting übergeben" if sent
                               else "Reporting nicht verbunden / keine Befunde")
+
+    # ── Tab 2: Abrufbare Passwörter ─────────────────────────────────────────────
+
+    def _build_passwords(self, parent):
+        tk.Label(parent, text=(
+            "⚠  Zeigt Zugangsdaten, die für DEINEN Benutzer im Klartext lesbar sind "
+            "(Windows Credential Vault + gespeicherte WLAN-Schlüssel). Genau diese sind "
+            "auch für Schadsoftware in deinem Benutzerkontext abrufbar."),
+            bg=DARK["bg"], fg=DARK["yellow"], font=("Segoe UI", 8),
+            justify="left", anchor="w").pack(fill="x", padx=10, pady=(8, 4))
+
+        bar = tk.Frame(parent, bg=DARK["bg"]); bar.pack(fill="x", padx=10, pady=2)
+        self._pw_btn = ttk.Button(bar, text="Passwörter abrufen",
+                                  style="Accent.TButton", command=self._start_pw)
+        self._pw_btn.pack(side="left")
+        self._pw_show = tk.BooleanVar(value=True)
+        ttk.Checkbutton(bar, text="Klartext anzeigen", variable=self._pw_show,
+                        command=self._render_pw).pack(side="left", padx=(10, 0))
+        ttk.Button(bar, text="Auswahl kopieren",
+                   command=self._copy_pw).pack(side="left", padx=(10, 0))
+        self._pw_sum = tk.StringVar(value="")
+        tk.Label(bar, textvariable=self._pw_sum, bg=DARK["bg"], fg=DARK["border"],
+                 font=("Segoe UI", 9, "bold")).pack(side="right", padx=8)
+
+        sec = self._section_expand(parent, "Abrufbare Zugangsdaten")
+        cols = ("source", "resource", "user", "password")
+        self._pw_tree = ttk.Treeview(sec, columns=cols, show="headings", selectmode="browse")
+        for c, t, w in [("source", "Quelle", 140), ("resource", "Ressource / WLAN", 320),
+                        ("user", "Benutzer", 220), ("password", "Passwort", 320)]:
+            self._pw_tree.heading(c, text=t)
+            self._pw_tree.column(c, width=w, anchor="w")
+        sb = ttk.Scrollbar(sec, command=self._pw_tree.yview)
+        self._pw_tree.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        self._pw_tree.pack(fill="both", expand=True, padx=6, pady=6)
+        self._pw_rows: list[dict] = []
+
+    def _start_pw(self):
+        self._pw_btn.configure(state="disabled")
+        for iid in self._pw_tree.get_children():
+            self._pw_tree.delete(iid)
+        self._pw_sum.set("Rufe ab …")
+        if self._activity_cb:
+            self._activity_cb("Abrufbare Passwörter werden gelesen")
+        threading.Thread(target=self._run_pw, daemon=True).start()
+
+    def _run_pw(self):
+        data, err = self._ps_json(_PASSWORDS_PS, timeout=120)
+        if not data and err:
+            self.after(0, lambda: (self._pw_btn.configure(state="normal"),
+                                   self._pw_sum.set(f"Fehler: {err}")))
+            return
+        self.after(0, self._store_pw, data)
+
+    def _store_pw(self, data: list[dict]):
+        self._pw_rows = data
+        self._pw_btn.configure(state="normal")
+        self._render_pw()
+
+    def _render_pw(self):
+        for iid in self._pw_tree.get_children():
+            self._pw_tree.delete(iid)
+        show = self._pw_show.get()
+        for d in self._pw_rows:
+            pw = d.get("password", "")
+            shown = pw if show else ("•" * min(len(pw), 12) if pw else "")
+            self._pw_tree.insert("", "end", values=(
+                d.get("source", ""), d.get("resource", ""), d.get("user", ""), shown))
+        n = len(self._pw_rows)
+        self._pw_sum.set(f"{n} abrufbare(s) Passwort/Passwörter"
+                         + ("" if show else " · ‚Klartext anzeigen' aktivieren"))
+        if self._activity_cb:
+            self._activity_cb(f"Abrufbare Passwörter: {n}")
+
+    def _copy_pw(self):
+        sel = self._pw_tree.selection()
+        if not sel:
+            return
+        idx = self._pw_tree.index(sel[0])
+        if 0 <= idx < len(self._pw_rows):
+            d = self._pw_rows[idx]
+            self.clipboard_clear()
+            self.clipboard_append(d.get("password", ""))
+            if self._activity_cb:
+                self._activity_cb(f"Passwort für {d.get('resource','')} kopiert")
