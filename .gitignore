@@ -23,6 +23,7 @@ nmap_*.xml
 
 # Secrets (niemals committen!)
 suite_config.json
+suite_config.json.*
 
 # IDE
 .vscode/

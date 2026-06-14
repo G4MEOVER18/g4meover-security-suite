@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 from modules.base import BaseModule
 from utils.theme import DARK
+from utils.meta import VERSION, AUTHOR, EMAIL, GITHUB, PAYPAL, BITCOIN
 
 # ─── Anleitungen ──────────────────────────────────────────────────────────────
 
@@ -283,7 +284,11 @@ class HelpModule(BaseModule):
 
         # Workflow-Button
         ttk.Button(left, text="Pentest-Workflow",
-                   command=self._show_workflow).pack(fill="x", padx=6, pady=(0, 8))
+                   command=self._show_workflow).pack(fill="x", padx=6, pady=(0, 2))
+
+        # Über & Kontakt
+        ttk.Button(left, text="Über & Kontakt",
+                   command=self._show_support).pack(fill="x", padx=6, pady=(0, 8))
 
         for name, data in GUIDES.items():
             self._guide_list.insert("end", f"  {data['icon']}  {name}")
@@ -371,3 +376,58 @@ class HelpModule(BaseModule):
         self._content.insert("end", PENTEST_WORKFLOW, "code")
         self._content.configure(state="disabled")
         self._content.see("1.0")
+
+    def _show_support(self):
+        import webbrowser
+        self._title_label.configure(text="Über & Kontakt")
+        self._kurz_label.configure(
+            text=f"G4MEOVER Security Suite v{VERSION} · von {AUTHOR}")
+
+        c = self._content
+        c.configure(state="normal")
+        c.delete("1.0", "end")
+
+        # Klickbare Link-Tags (einmalig konfiguriert)
+        for tag, target in (("lnk_github", GITHUB),
+                            ("lnk_mail", f"mailto:{EMAIL}"),
+                            ("lnk_paypal", PAYPAL)):
+            c.tag_configure(tag, foreground=DARK["accent"],
+                            font=("Segoe UI", 9, "underline"))
+            c.tag_bind(tag, "<Enter>", lambda _e: c.configure(cursor="hand2"))
+            c.tag_bind(tag, "<Leave>", lambda _e: c.configure(cursor=""))
+            c.tag_bind(tag, "<Button-1>",
+                       lambda _e, t=target: webbrowser.open(t))
+
+        c.tag_configure("btc_addr", foreground=DARK["orange"],
+                        font=("Consolas", 9))
+        c.tag_bind("btc_addr", "<Enter>", lambda _e: c.configure(cursor="hand2"))
+        c.tag_bind("btc_addr", "<Leave>", lambda _e: c.configure(cursor=""))
+        c.tag_bind("btc_addr", "<Button-1>", lambda _e: self._copy_btc())
+
+        c.insert("end", "Kontakt\n\n", "step_title")
+        c.insert("end", "  E-Mail:  ", "step_body")
+        c.insert("end", EMAIL + "\n", "lnk_mail")
+        c.insert("end", "  GitHub:  ", "step_body")
+        c.insert("end", GITHUB + "\n\n", "lnk_github")
+
+        c.insert("end", "Projekt unterstützen\n\n", "tipp_head")
+        c.insert("end", "  PayPal:  ", "step_body")
+        c.insert("end", PAYPAL + "\n", "lnk_paypal")
+        c.insert("end", "  Bitcoin: ", "step_body")
+        c.insert("end", BITCOIN + "  (klicken zum Kopieren)\n\n", "btc_addr")
+
+        c.insert("end",
+                 "Diese Suite ist freie Software (MIT-Lizenz). Wenn sie dir "
+                 "hilft, freue ich mich über einen Stern auf GitHub oder eine "
+                 "kleine Spende.\n\n", "step_body")
+        c.insert("end",
+                 "Nutzung nur für autorisierte Sicherheitstests, CTF & Bildung.\n",
+                 "tipp")
+
+        c.configure(state="disabled")
+        c.see("1.0")
+
+    def _copy_btc(self):
+        self.clipboard_clear()
+        self.clipboard_append(BITCOIN)
+        self._kurz_label.configure(text="Bitcoin-Adresse in Zwischenablage kopiert ✓")

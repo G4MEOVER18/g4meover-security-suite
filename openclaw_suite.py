@@ -20,26 +20,43 @@ sys.path.insert(0, str(_ROOT))
 # ─── Config laden ─────────────────────────────────────────────────────────────
 CONFIG_FILE = _ROOT / "suite_config.json"
 
-VERSION = "2.4"
-AUTHOR  = "Yanis Ameseder"
-GITHUB  = "https://github.com/G4MEOVER18/g4meover-security-suite"
+from utils.meta import VERSION, AUTHOR, EMAIL, GITHUB, PAYPAL, BITCOIN
 
 
 def _load_config() -> dict:
-    if CONFIG_FILE.exists():
+    if not CONFIG_FILE.exists():
+        return {}
+    try:
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        # Korrupte Config nicht stillschweigend verwerfen: zur Seite sichern,
+        # damit der Nutzer manuell retten kann, dann mit leerer Config starten.
+        backup = CONFIG_FILE.with_suffix(".json.corrupt")
         try:
-            return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return {}
+            CONFIG_FILE.replace(backup)
+            print(f"[!] Config beschädigt ({e}). Defekte Datei gesichert: "
+                  f"{backup.name}", file=sys.stderr)
+        except OSError:
+            print(f"[!] Config beschädigt und konnte nicht gesichert werden: "
+                  f"{e}", file=sys.stderr)
+        return {}
 
 
 def _save_config(cfg: dict):
+    # Atomar schreiben: erst in temporäre Datei, dann ersetzen – verhindert
+    # eine halb geschriebene (korrupte) Config bei Absturz während des Speicherns.
+    tmp = CONFIG_FILE.with_suffix(".json.tmp")
     try:
-        CONFIG_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False),
-                               encoding="utf-8")
-    except Exception:
-        pass
+        tmp.write_text(json.dumps(cfg, indent=2, ensure_ascii=False),
+                       encoding="utf-8")
+        tmp.replace(CONFIG_FILE)
+    except OSError as e:
+        print(f"[!] Config konnte nicht gespeichert werden: {e}",
+              file=sys.stderr)
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 # ─── Imports ──────────────────────────────────────────────────────────────────
@@ -452,6 +469,19 @@ class G4MEOVERSuite(tk.Tk):
         gh_lbl.pack(side="left")
         gh_lbl.bind("<Button-1>", lambda _: self._open_url(GITHUB))
 
+        # Kontakt-E-Mail
+        mail_row = tk.Frame(mid, bg=DARK["bg"])
+        mail_row.pack(anchor="w", pady=(2, 0))
+        tk.Label(mail_row, text="Kontakt:",
+                 bg=DARK["bg"], fg=DARK["border"],
+                 font=("Segoe UI", 8)).pack(side="left")
+        mail_lbl = tk.Label(mail_row, text=f" {EMAIL}",
+                            bg=DARK["bg"], fg=DARK["accent"],
+                            font=("Segoe UI", 8, "underline"), cursor="hand2")
+        mail_lbl.pack(side="left")
+        mail_lbl.bind("<Button-1>",
+                      lambda _: self._open_url(f"mailto:{EMAIL}"))
+
         # ── Tools ─────────────────────────────────────────────────────────────
         tk.Frame(win, bg=DARK["border"], height=1).pack(fill="x")
         tk.Label(win, text="Integrierte Tools",
@@ -503,6 +533,37 @@ class G4MEOVERSuite(tk.Tk):
 
         tools_frame.columnconfigure(0, weight=1)
         tools_frame.columnconfigure(1, weight=1)
+
+        # ── Unterstützung / Spenden ─────────────────────────────────────────────
+        tk.Frame(win, bg=DARK["border"], height=1).pack(fill="x")
+        tk.Label(win, text="Projekt unterstützen",
+                 bg=DARK["bg"], fg=DARK["border"],
+                 font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=24, pady=(8, 2))
+
+        donate = tk.Frame(win, bg=DARK["bg"])
+        donate.pack(fill="x", padx=24)
+
+        pp_lbl = tk.Label(donate, text="PayPal",
+                          bg=DARK["accent"], fg=DARK["bg"],
+                          font=("Segoe UI", 8, "bold"),
+                          padx=8, pady=2, cursor="hand2")
+        pp_lbl.pack(side="left", padx=(0, 8))
+        pp_lbl.bind("<Button-1>", lambda _: self._open_url(PAYPAL))
+
+        tk.Label(donate, text="BTC:",
+                 bg=DARK["bg"], fg=DARK["border"],
+                 font=("Segoe UI", 8)).pack(side="left")
+        btc_lbl = tk.Label(donate, text=BITCOIN,
+                           bg=DARK["bg"], fg=DARK["orange"],
+                           font=("Consolas", 8, "underline"), cursor="hand2")
+        btc_lbl.pack(side="left", padx=(2, 0))
+
+        def _copy_btc(_=None):
+            self.clipboard_clear()
+            self.clipboard_append(BITCOIN)
+            btc_lbl.configure(text="BTC-Adresse kopiert ✓")
+            self.after(1500, lambda: btc_lbl.configure(text=BITCOIN))
+        btc_lbl.bind("<Button-1>", _copy_btc)
 
         # ── Disclaimer ────────────────────────────────────────────────────────
         disc = tk.Label(win,

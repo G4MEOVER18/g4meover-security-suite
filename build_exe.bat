@@ -7,7 +7,7 @@ title G4MEOVER Suite Builder
 
 echo.
 echo ============================================================
-echo   G4MEOVER Security Suite v1.3 – EXE Builder
+echo   G4MEOVER Security Suite v2.4 – EXE Builder
 echo   by Yanis Ameseder
 echo ============================================================
 echo.
@@ -37,7 +37,6 @@ if not exist "assets\g4meover.ico" (
         --version-file version_info.txt ^
         --add-data "modules;modules" ^
         --add-data "utils;utils" ^
-        --add-data "suite_config.json;." ^
         --hidden-import tkinter ^
         --hidden-import tkinter.ttk ^
         --hidden-import tkinter.messagebox ^

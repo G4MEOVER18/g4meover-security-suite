@@ -11,7 +11,10 @@ a = Analysis(
     datas=[
         ('modules',        'modules'),
         ('utils',          'utils'),
-        ('suite_config.json', '.'),
+        # suite_config.json wird BEWUSST NICHT gebündelt – sie kann API-Keys
+        # enthalten und PyInstaller-Archive sind trivial entpackbar. Die App
+        # startet ohne Config (_load_config gibt {} zurück); Tools werden
+        # automatisch erkannt, Keys trägt der Nutzer in den Einstellungen ein.
         ('assets',         'assets'),
     ],
     hiddenimports=[

@@ -1,0 +1,16 @@
+# G4MEOVER Security Suite – Laufzeit-Abhängigkeiten
+# Installation:  pip install -r requirements.txt
+#
+# tkinter gehört zur Python-Standardbibliothek und wird NICHT über pip
+# installiert (bei Windows-Python bereits enthalten).
+
+# GUI: Logo/Icon-Rendering im Header und About-Dialog
+pillow>=12.2.0
+
+# WiFi: Handshake-Sniffer, Deauth und PMKID-Extraktion (Module handshake, pmkid)
+scapy>=2.7.0
+
+# ── Optional ────────────────────────────────────────────────────────────────
+# Nur für die Entwickler-Hilfsskripte take_screenshots.py / create_screenshots.py
+# benötigt (nicht für den Betrieb der Suite):
+# pywin32>=306
