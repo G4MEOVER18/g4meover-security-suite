@@ -2,6 +2,8 @@
 
 # G4MEOVER Security Suite
 
+[![CI](https://github.com/G4MEOVER18/g4meover-security-suite/actions/workflows/python-lint.yml/badge.svg)](https://github.com/G4MEOVER18/g4meover-security-suite/actions/workflows/python-lint.yml)
+
 **All-in-One Security Suite für Windows · offensiv + defensiv · Python 3.12 · Catppuccin Mocha**
 
 [![Version](https://img.shields.io/badge/Version-2.4-blue?style=flat-square)](https://github.com/G4MEOVER18/g4meover-security-suite/releases)
